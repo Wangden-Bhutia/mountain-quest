@@ -8,6 +8,8 @@ import fs from 'node:fs';
 
 const BASE = process.env.MQ_URL || 'http://127.0.0.1:8765/mountain-quest/';
 const SHOTS = process.env.MQ_SHOTS || '/workspace/mountain-quest-shots/';
+const FS_SHOTS = SHOTS.replace(/\/?$/, '/') + 'fullscreen/';
+fs.mkdirSync(FS_SHOTS, { recursive: true });
 fs.mkdirSync(SHOTS, { recursive: true });
 const VIEWS = { portrait: { width: 390, height: 844 }, landscape: { width: 844, height: 390 } };
 const ASPECTS = { '844x390': [844, 390], '915x412': [915, 412], '960x384': [960, 384], '667x375': [667, 375], '1024x768': [1024, 768] };
@@ -300,7 +302,7 @@ for (const [name, [w, h]] of Object.entries(ASPECTS)) {
     assert.deepStrictEqual([c.x, c.y, c.w, c.h], [0, 0, w, h], 'canvas box = viewport');
     assert.ok(Math.abs(c.bw / c.bh - w / h) < 0.01, 'backing store has the screen aspect (no letterbox)');
     // no blank bars: every edge pixel row/column is painted with game art, not the page background
-    const buf = await page.screenshot({ path: `/workspace/mountain-quest-shots/fullscreen/play-${name}.png` });
+    const buf = await page.screenshot({ path: `${FS_SHOTS}play-${name}.png` });
     const blank = await page.evaluate(async (b64) => {
       const img = new Image(); img.src = 'data:image/png;base64,' + b64; await img.decode();
       const cv = document.createElement('canvas'); cv.width = img.width; cv.height = img.height;
@@ -328,7 +330,7 @@ test('safe-area insets keep buttons clear of a notch (simulated 44px)', async ()
   const left = await page.$eval('[data-k="left"]', b => b.getBoundingClientRect().left);
   const right = await page.$eval('#btnFull', b => b.getBoundingClientRect().right);
   assert.ok(left >= 44 && right <= 915 - 44, `${left} ${right}`);
-  await page.screenshot({ path: '/workspace/mountain-quest-shots/fullscreen/notch-sim-915x412.png' });
+  await page.screenshot({ path: `${FS_SHOTS}notch-sim-915x412.png` });
   await ctx.close();
 });
 
@@ -338,7 +340,7 @@ test('pause and settings have a full screen switch', async () => {
   await page.tap('#btnPause'); await page.waitForTimeout(150);
   assert.ok(await page.isVisible('#menu [data-panel="pause"] [data-act="fullscreen"]'));
   await axe(page, 'pause with full screen');
-  await page.screenshot({ path: '/workspace/mountain-quest-shots/fullscreen/pause-844x390.png' });
+  await page.screenshot({ path: `${FS_SHOTS}pause-844x390.png` });
   await page.tap('#menu [data-panel="pause"] [data-act="settings"]'); await page.waitForTimeout(150);
   assert.ok(await page.isVisible('#sFs')); await axe(page, 'settings with full screen');
   await ctx.close();
