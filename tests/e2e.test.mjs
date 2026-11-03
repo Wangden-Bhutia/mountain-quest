@@ -96,7 +96,9 @@ for (const view of Object.keys(VIEWS)) {
 
     // a new-mechanic stage and the boss
     await page.evaluate(() => window.__MQ.load(8)); await page.waitForTimeout(2600); await shot('07-frozen-falls');
-    await page.evaluate(() => window.__MQ.load(11)); await page.waitForTimeout(2600); await shot('08-boss');
+    await page.evaluate(() => window.__MQ.load(16)); await page.waitForTimeout(2600); await shot('08-boss');
+    await page.evaluate(() => window.__MQ.load(12)); await page.waitForTimeout(2600); await shot('13-spring-canyon');
+    await page.evaluate(() => window.__MQ.load(14)); await page.waitForTimeout(2600); await shot('14-frost-gate');
 
     // ending
     await page.evaluate(() => window.__MQ.end()); await page.waitForTimeout(500);
@@ -108,7 +110,7 @@ for (const view of Object.keys(VIEWS)) {
 
     // progress survives a reload
     await page.reload(); await page.waitForFunction(() => window.__MQ && window.__MQ.state().menu === 'main');
-    s = await st(page); assert.ok(s.save.finished); assert.strictEqual(s.save.unlocked, 12, 'finishing opens every chapter');
+    s = await st(page); assert.ok(s.save.finished); assert.strictEqual(s.save.unlocked, 17, 'finishing opens every chapter');
     assert.strictEqual(await page.isVisible('#mContinue'), true);
     await page.tap('[data-act="chapters"]'); await page.waitForTimeout(200);
     await shot('11-level-select-progress');
@@ -166,5 +168,80 @@ test('portrait rotate button turns the stage into landscape', async () => {
   assert.match(await page.$eval('#stage', e => e.className), /rot/);
   await page.tap('#mNew'); await page.waitForTimeout(2600);
   await page.screenshot({ path: `${SHOTS}12-gameplay-rotated-portrait.png` });
+  await ctx.close();
+});
+
+test('offline: load once, go offline, reload and play', async () => {
+  const ctx = await browser.newContext({ viewport: VIEWS.landscape, isMobile: true, hasTouch: true });
+  const page = await ctx.newPage();
+  await page.goto(BASE);
+  await page.evaluate(() => navigator.serviceWorker.ready);
+  await page.waitForFunction(() => !!navigator.serviceWorker.controller, null, { timeout: 15000 });
+  await ctx.setOffline(true);
+  await page.reload();
+  await page.waitForFunction(() => window.__MQ && window.__MQ.state().menu === 'main');
+  await page.tap('#mNew'); await page.waitForTimeout(300);
+  const r = await page.$('[data-k="right"]');
+  await r.dispatchEvent('pointerdown', { pointerId: 3 }); await page.waitForTimeout(800); await r.dispatchEvent('pointerup', { pointerId: 3 });
+  const s = await st(page);
+  assert.strictEqual(s.state, 'play'); assert.ok(s.x > 150, 'moved while offline');
+  // a deep link also falls back to the cached game
+  await page.goto(BASE + '?from=homescreen');
+  await page.waitForFunction(() => window.__MQ && window.__MQ.state().menu === 'main');
+  await page.screenshot({ path: `${SHOTS}17-offline-reload-landscape.png` });
+  await ctx.close();
+});
+
+test('install button: hidden by default, shown on beforeinstallprompt, hidden after install / when standalone', async () => {
+  const { ctx, page, errors } = await open('landscape');
+  assert.strictEqual(await page.isVisible('#menu [data-panel="main"] [data-act="install"]'), false, 'hidden without the event');
+  await page.evaluate(() => {
+    const e = new Event('beforeinstallprompt', { cancelable: true });
+    e.prompt = () => { window.__prompted = true; }; e.userChoice = Promise.resolve({ outcome: 'accepted' });
+    window.dispatchEvent(e);
+  });
+  assert.strictEqual(await page.isVisible('#menu [data-panel="main"] [data-act="install"]'), true);
+  await page.screenshot({ path: `${SHOTS}15-install-button-landscape.png` });
+  await axe(page, 'title with install');
+  await noOverlap(page, '#ui .ctl, #menu .mbtn', 'title with install');
+  await page.tap('#menu [data-panel="main"] [data-act="install"]');
+  assert.strictEqual(await page.evaluate(() => window.__prompted), true, 'prompt() called');
+  await page.waitForTimeout(100);
+  assert.strictEqual(await page.isVisible('#menu [data-panel="main"] [data-act="install"]'), false, 'hidden after prompting');
+  await page.evaluate(() => window.dispatchEvent(new Event('appinstalled')));
+  assert.deepStrictEqual(errors, []);
+  await ctx.close();
+
+  const sa = await open('portrait', { init: () => { const mm = window.matchMedia.bind(window); window.matchMedia = (q) => /display-mode/.test(q) ? { matches: true, media: q, addEventListener() {}, removeEventListener() {} } : mm(q); } });
+  await sa.page.evaluate(() => { const e = new Event('beforeinstallprompt'); e.prompt = () => {}; window.dispatchEvent(e); });
+  assert.strictEqual(await sa.page.isVisible('[data-act="install"]'), false, 'hidden when already installed');
+  await sa.ctx.close();
+});
+
+test('install on iOS shows the Add to Home Screen hint', async () => {
+  const ctx = await browser.newContext({ viewport: VIEWS.portrait, isMobile: true, hasTouch: true, deviceScaleFactor: 2,
+    userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1' });
+  const page = await ctx.newPage();
+  await page.goto(BASE); await page.waitForFunction(() => window.__MQ && window.__MQ.state().menu === 'main');
+  assert.strictEqual(await page.isVisible('#menu [data-panel="main"] [data-act="install"]'), true);
+  await page.screenshot({ path: `${SHOTS}15-install-button-portrait.png` });
+  await page.tap('#menu [data-panel="main"] [data-act="install"]'); await page.waitForTimeout(150);
+  assert.strictEqual((await st(page)).menu, 'iosinstall');
+  await axe(page, 'ios install hint');
+  await page.screenshot({ path: `${SHOTS}16-ios-install-hint-portrait.png` });
+  await ctx.close();
+});
+
+test('save migration: a v1 (12-chapter) save keeps its progress', async () => {
+  const { ctx, page } = await open('landscape', { init: () => {
+    if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1');
+      localStorage.setItem('mountain-quest:v1', JSON.stringify({ v: 1, unlocked: 11, best: { 3: 7, 10: 5, 11: 3 }, finished: false, settings: { muted: true, sfx: true, music: false, motion: 'auto' } })); }
+  } });
+  const s = (await st(page)).save;
+  assert.strictEqual(s.unlocked, 16, 'Old Horn (was 11) is now 16');
+  assert.deepStrictEqual(s.best, { 3: 7, 15: 5, 16: 3 });
+  assert.strictEqual(s.settings.muted, true); assert.strictEqual(s.settings.music, false);
+  await page.tap('[data-act="chapters"]'); await page.waitForTimeout(150);
+  await page.screenshot({ path: `${SHOTS}18-level-select-migrated-landscape.png` });
   await ctx.close();
 });

@@ -3,13 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'none'; connect-src 'none'; font-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'none'; connect-src 'none'; font-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; worker-src 'self'; manifest-src 'self'">
 <meta name="theme-color" content="#0d1b2a">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="description" content="Mountain Quest: a twelve-chapter platform adventure to bring the village bell's clapper home.">
-<link rel="icon" href="data:,">
+<meta name="description" content="Mountain Quest: a seventeen-chapter platform adventure to bring the village bell's clapper home.">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
 <link rel="stylesheet" href="css/style.css">
 <title>Mountain Quest</title>
 </head>
@@ -74,6 +76,7 @@
         <button type="button" class="mbtn" data-act="settings">Settings</button>
         <button type="button" class="mbtn" data-act="help">How to play</button>
         <button type="button" class="mbtn" data-act="credits">Story &amp; credits</button>
+        <button type="button" class="mbtn install" data-act="install" hidden>Install app</button>
       </section>
       <section class="mpanel" data-panel="pause" aria-labelledby="hPause" hidden>
         <h2 id="hPause">Paused</h2>
@@ -96,6 +99,7 @@
         <div class="row"><span id="lMotion">Motion</span><button type="button" class="tog" id="sMotion" data-act="motion" aria-labelledby="lMotion sMotion">Auto (system)</button></div>
         <p id="sStore" class="muted" hidden>This browser is not letting the game save, so progress will be lost when you close it.</p>
         <div class="gap"></div>
+        <button type="button" class="mbtn install" data-act="install" hidden>Install app (play offline)</button>
         <button type="button" class="mbtn" data-act="reset">Reset progress</button>
         <button type="button" class="mbtn" data-act="back">Back</button>
       </section>
@@ -111,11 +115,16 @@
         </ul>
         <button type="button" class="mbtn" data-act="back">Back</button>
       </section>
+      <section class="mpanel" data-panel="iosinstall" aria-labelledby="hIos" hidden>
+        <h2 id="hIos">Install on iPhone or iPad</h2>
+        <p>In Safari, tap the Share button, then choose <strong>Add to Home Screen</strong>. The game then opens from your home screen and plays offline.</p>
+        <button type="button" class="mbtn" data-act="back">Back</button>
+      </section>
       <section class="mpanel" data-panel="credits" aria-labelledby="hCred" hidden>
         <h2 id="hCred">Story &amp; credits</h2>
         <div id="storyList"></div>
         <h3>Credits</h3>
-        <p>Mountain Quest, extended edition: twelve chapters and a training ground, drawn in code with HTML5 canvas, with music and sound made live in the browser. No downloads, trackers or ads.</p>
+        <p>Mountain Quest, extended edition: seventeen chapters and a training ground, drawn in code with HTML5 canvas, with music and sound made live in the browser. No downloads, trackers or ads.</p>
         <p class="muted">Story, new chapters, Old Horn and the bell are original to this game.</p>
         <button type="button" class="mbtn" data-act="back">Back</button>
       </section>
@@ -127,5 +136,6 @@
 <script src="js/physics.js"></script>
 <script src="js/data.js"></script>
 <script src="js/game.js"></script>
+<script src="js/pwa.js"></script>
 </body>
 </html>

@@ -24,7 +24,7 @@
   var SAVE_KEY = 'mountain-quest:v1';
   var storageOK = true, storageWarned = false;
   function defaults() {
-    return { v: 1, unlocked: 0, best: {}, finished: false,
+    return { v: 2, unlocked: 0, best: {}, finished: false,
       settings: { muted: false, sfx: true, music: true, motion: 'auto' } };
   }
   function loadSave() {
@@ -34,10 +34,19 @@
       if (!raw) return d;
       var s = JSON.parse(raw);
       if (!s || typeof s !== 'object') return d;
-      d.unlocked = Math.max(0, Math.min(LEVELS.length - 1, s.unlocked | 0));
+      // v1 saves (12 chapters) -> v2: five chapters were inserted after
+      // Starlit Gorge (index 9), so later chapter numbers move up by five
+      var old = (s.v | 0) < 2;
+      var shift = function (i) { return old && i >= 10 ? i + 5 : i; };
+      d.unlocked = Math.max(0, Math.min(LEVELS.length - 1, shift(s.unlocked | 0)));
       if (s.best && typeof s.best === 'object') {
-        for (var k in s.best) if (Object.prototype.hasOwnProperty.call(s.best, k) && +k >= 0 && +k < LEVELS.length) d.best[k] = Math.max(0, s.best[k] | 0);
+        for (var k in s.best) {
+          if (!Object.prototype.hasOwnProperty.call(s.best, k)) continue;
+          var nk = shift(+k);
+          if (+k >= 0 && nk < LEVELS.length) d.best[String(nk)] = Math.max(0, s.best[k] | 0);
+        }
       }
+      if (old && s.finished) d.unlocked = LEVELS.length - 1;
       d.finished = !!s.finished;
       if (s.settings) {
         d.settings.muted = !!s.settings.muted;
@@ -1544,7 +1553,7 @@
 
     var tx = W * 0.3;
     txtShadow('MOUNTAIN QUEST', tx, 82, 50, '#ffffff', 'center');
-    txt('a twelve-chapter platform adventure', tx, 124, 18, 'rgba(255,255,255,0.94)', 'center', '600');
+    txt('a seventeen-chapter platform adventure', tx, 124, 18, 'rgba(255,255,255,0.94)', 'center', '600');
     txt('starring our bravest little mountaineer', tx, 148, 18, 'rgba(255,255,255,0.94)', 'center', '600');
 
     // grassy mound the hero stands on
@@ -1903,6 +1912,7 @@
         case 'settings': api.show('settings'); break;
         case 'credits': api.show('credits'); break;
         case 'help': api.show('help'); break;
+        case 'install': if (window.__MQ_INSTALL && window.__MQ_INSTALL() === 'ios') api.show('iosinstall'); break;
         case 'back': api.back(); break;
         case 'resume': togglePause(); break;
         case 'restart': G.paused = false; api.close(); replay(); break;

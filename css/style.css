@@ -146,7 +146,9 @@
   }
   .mbtn.primary { background: #ffd0e0; color: #17242f; border-color: #fff; }
   .mbtn:focus-visible, .chap:focus-visible, .tog:focus-visible { outline: 3px solid #ffe89a; outline-offset: 2px; }
-  .mbtn[hidden] { display: none; }
+  .mbtn[hidden] { display: none !important; }
+  .mbtn.install { border-color: #ffe89a; color: #ffe89a; }
+  body.title-screen .mpanel[data-panel="main"] .mbtn.install { grid-column: 1 / -1; }
   .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px; border-bottom: 1px solid rgba(255,255,255,0.12); }
   .row span { font-size: 16px; font-weight: 700; }
   .tog {

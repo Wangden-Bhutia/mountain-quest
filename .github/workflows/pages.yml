@@ -24,6 +24,8 @@ jobs:
         with:
           node-version: 22
       - run: npm ci
+      - name: Service worker precache is up to date
+        run: node tools/build-sw.js --check
       - name: Unit, data and stage solvability tests
         run: npm test
       - run: npx playwright install --with-deps chromium
@@ -45,7 +47,7 @@ jobs:
       - name: Build site folder (game files only)
         run: |
           mkdir -p _site
-          cp -r index.html css js _site/
+          cp -r index.html manifest.webmanifest sw.js css js icons _site/
           touch _site/.nojekyll
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
