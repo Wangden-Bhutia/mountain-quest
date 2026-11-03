@@ -47,6 +47,8 @@ for (const view of Object.keys(VIEWS)) {
     const { ctx, page, ext, errors } = await open(view);
     const shot = (n) => page.screenshot({ path: `${SHOTS}${n}-${view}.png` });
     await page.waitForTimeout(400);
+    if (view === 'portrait') { assert.strictEqual(await page.isVisible('#turn'), true); await page.tap('#turnAnyway'); }
+    else assert.strictEqual(await page.isVisible('#turn'), false);
     await shot('01-title');
     await axe(page, 'title');
     await noOverlap(page, '#ui .ctl, #menu .mbtn', 'title');
@@ -164,7 +166,8 @@ test('reduced motion is respected', async () => {
 
 test('portrait rotate button turns the stage into landscape', async () => {
   const { ctx, page } = await open('portrait');
-  await page.tap('#btnRot'); await page.waitForTimeout(900);
+  await page.tap('#turnRotate'); await page.waitForTimeout(900);
+  assert.strictEqual(await page.isVisible('#turn'), false, 'manual rotate dismisses the card');
   assert.match(await page.$eval('#stage', e => e.className), /rot/);
   await page.tap('#mNew'); await page.waitForTimeout(2600);
   await page.screenshot({ path: `${SHOTS}12-gameplay-rotated-portrait.png` });
@@ -184,7 +187,7 @@ test('offline: load once, go offline, reload and play', async () => {
   const r = await page.$('[data-k="right"]');
   await r.dispatchEvent('pointerdown', { pointerId: 3 }); await page.waitForTimeout(800); await r.dispatchEvent('pointerup', { pointerId: 3 });
   const s = await st(page);
-  assert.strictEqual(s.state, 'play'); assert.ok(s.x > 150, 'moved while offline');
+  assert.strictEqual(s.state, 'play'); assert.ok(s.x > 300, 'moved while offline');
   // a deep link also falls back to the cached game
   await page.goto(BASE + '?from=homescreen');
   await page.waitForFunction(() => window.__MQ && window.__MQ.state().menu === 'main');
@@ -223,6 +226,7 @@ test('install on iOS shows the Add to Home Screen hint', async () => {
     userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1' });
   const page = await ctx.newPage();
   await page.goto(BASE); await page.waitForFunction(() => window.__MQ && window.__MQ.state().menu === 'main');
+  await page.tap('#turnAnyway');
   assert.strictEqual(await page.isVisible('#menu [data-panel="main"] [data-act="install"]'), true);
   await page.screenshot({ path: `${SHOTS}15-install-button-portrait.png` });
   await page.tap('#menu [data-panel="main"] [data-act="install"]'); await page.waitForTimeout(150);
@@ -243,5 +247,40 @@ test('save migration: a v1 (12-chapter) save keeps its progress', async () => {
   assert.strictEqual(s.settings.muted, true); assert.strictEqual(s.settings.music, false);
   await page.tap('[data-act="chapters"]'); await page.waitForTimeout(150);
   await page.screenshot({ path: `${SHOTS}18-level-select-migrated-landscape.png` });
+  await ctx.close();
+});
+
+test('landscape first: portrait shows the turn card, rotating dismisses it, play-anyway is remembered', async () => {
+  const { ctx, page, errors } = await open('portrait');
+  assert.strictEqual(await page.isVisible('#turn'), true);
+  await axe(page, 'turn card'); // axe scope is #menu; check the card too
+  const r = await new AxeBuilder({ page }).include('#turn').analyze();
+  assert.deepStrictEqual(r.violations.filter(v => v.impact === 'serious' || v.impact === 'critical').map(v => v.id), []);
+  await noOverlap(page, '#turn .mbtn', 'turn card');
+  await page.screenshot({ path: `${SHOTS}19-turn-sideways-portrait.png` });
+  await page.setViewportSize(VIEWS.landscape); await page.waitForTimeout(300);
+  assert.strictEqual(await page.isVisible('#turn'), false, 'gone in landscape');
+  await page.tap('#mNew'); await page.waitForTimeout(2600);
+  await page.screenshot({ path: `${SHOTS}20-landscape-play-landscape.png` });
+  // hero stays clear of the left pads at the start
+  const pads = await page.$eval('[data-k="right"]', b => b.getBoundingClientRect().right);
+  const heroX = await page.evaluate(() => { const c = document.getElementById('game').getBoundingClientRect(); const sc = Math.min(c.width / 960, c.height / 540); const ox = c.x + (c.width - 960 * sc) / 2; const s = window.__MQ.state(); return ox + (s.x - 0) * sc; });
+  assert.ok(heroX > pads, `hero ${heroX} right of pads ${pads}`);
+  // back to portrait mid-game: card returns and the game pauses
+  await page.setViewportSize(VIEWS.portrait); await page.waitForTimeout(300);
+  let s = await st(page); assert.ok(s.turn && s.paused, 'paused under the card');
+  await page.tap('#turnAnyway'); await page.waitForTimeout(100);
+  assert.strictEqual(await page.isVisible('#turn'), false);
+  await page.reload(); await page.waitForFunction(() => window.__MQ && window.__MQ.state().menu === 'main');
+  assert.strictEqual(await page.isVisible('#turn'), false, 'choice remembered');
+  assert.deepStrictEqual(errors, []);
+  await ctx.close();
+});
+
+test('desktop never sees the turn card', async () => {
+  const ctx = await browser.newContext({ viewport: { width: 600, height: 900 } });
+  const page = await ctx.newPage(); await page.goto(BASE);
+  await page.waitForFunction(() => window.__MQ && window.__MQ.state().menu === 'main');
+  assert.strictEqual(await page.isVisible('#turn'), false);
   await ctx.close();
 });

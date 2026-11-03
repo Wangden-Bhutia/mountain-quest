@@ -10,7 +10,7 @@ test('manifest has the fields browsers need to offer install', () => {
   assert.strictEqual(m.id, '/mountain-quest/');
   assert.strictEqual(m.start_url, './'); assert.strictEqual(m.scope, './');
   assert.ok(['fullscreen', 'standalone'].includes(m.display));
-  assert.strictEqual(m.orientation, 'any');
+  assert.strictEqual(m.orientation, 'landscape');
   assert.match(m.theme_color, /^#[0-9a-f]{6}$/i); assert.match(m.background_color, /^#[0-9a-f]{6}$/i);
   assert.ok(m.name && m.short_name && m.short_name.length <= 12);
 });

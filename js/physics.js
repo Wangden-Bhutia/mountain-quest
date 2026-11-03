@@ -48,7 +48,7 @@
       } : null,
       checkpoints: (src.checkpoints || []).map(function (x) { return { x: x, hit: false }; }),
       goal: src.goal,
-      start: { x: 70, y: GY - 112 }
+      start: { x: 190, y: GY - 112 }   // clear of the left touch pads in landscape
     };
     return w;
   }

@@ -305,6 +305,7 @@
   };
   window.addEventListener('keydown', function (e) {
     unlockAudio();
+    if (document.body.classList.contains('turn-open')) return;
     if (e.code === 'Escape') { e.preventDefault(); onEscape(); return; }
     if (e.code === 'KeyP' && (!menuOpen() || UI.open === 'pause')) { togglePause(); e.preventDefault(); return; }
     if (menuOpen()) return;   // let menu buttons take Space / Enter normally
@@ -384,7 +385,7 @@
 
   // ---------------------------------------------------------------- tutorial
   var TUTORIAL = [
-    { text: 'Tap  ▶  to walk right', kb: 'Press  →  to walk right', btn: 'right', done: function () { return G.p.x > 250; } },
+    { text: 'Tap  ▶  to walk right', kb: 'Press  →  to walk right', btn: 'right', done: function () { return G.p.x > 330; } },
     { text: 'Tap  JUMP  to jump', kb: 'Press  SPACE  to jump', btn: 'jump', done: function () { return G.jumped; } },
     { text: 'Run into the coins to collect them', btn: 'right', done: function () { return G.coins >= 3; } },
     { text: 'Jump across the water', btn: 'jump', done: function () { return G.p.x > 800; } },
@@ -1942,6 +1943,8 @@
     if (pb) pb.hidden = !(G.state === 'play');
   }
 
+  // the turn-your-phone card pauses the game while it is up
+  document.addEventListener('mq-turn', function (e) { if (e.detail && e.detail.open) { releaseAll(); autoPause(); } });
   document.getElementById('btnPause').addEventListener('click', function (e) {
     e.preventDefault(); e.stopPropagation(); togglePause();
   });
@@ -1954,7 +1957,7 @@
   };
   // test hooks (read-only views + a few safe actions) used by tests/e2e.spec.js
   window.__MQ = {
-    state: function () { return { state: G.state, idx: G.idx, lives: G.lives, coins: G.coins, paused: G.paused, x: G.p ? G.p.x : null, menu: UI.open, rm: RM, held: { l: held.left, r: held.right, j: held.jump }, audio: AC ? AC.state : 'none', save: SAVE }; },
+    state: function () { return { turn: document.body.classList.contains('turn-open'), state: G.state, idx: G.idx, lives: G.lives, coins: G.coins, paused: G.paused, x: G.p ? G.p.x : null, menu: UI.open, rm: RM, held: { l: held.left, r: held.right, j: held.jump }, audio: AC ? AC.state : 'none', save: SAVE }; },
     start: function (i) { startChapter(i, true); },
     load: function (i) { UI.close(); G.lives = 3; loadLevel(i); },
     win: function () { if (G.state === 'play') completeLevel(); },

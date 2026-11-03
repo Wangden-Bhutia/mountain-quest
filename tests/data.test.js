@@ -14,7 +14,7 @@ for (const [i, L] of D.LEVELS.entries()) {
   test(`stage ${i} ${L.name}: layout sanity`, () => {
     assert.ok(L.goal < L.width, 'goal inside world');
     assert.ok(onGround(L, L.goal - 30, L.goal + 30), 'goal stands on ground');
-    assert.ok(onGround(L, 70, 116), 'start on ground');
+    assert.ok(onGround(L, 190, 236), 'start on ground');
     for (const cp of L.checkpoints) assert.ok(onGround(L, cp - 20, cp + 26), `checkpoint ${cp} respawns on ground`);
     for (const e of L.enemies) {
       const w = e.t === 'hop' ? 40 : 46;
