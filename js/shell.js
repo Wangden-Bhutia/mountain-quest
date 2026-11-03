@@ -67,6 +67,11 @@
     document.addEventListener('fullscreenchange', syncFS);
     document.addEventListener('webkitfullscreenchange', syncFS);
 
+    window.__MQ_FS = {
+      enter: function () { if (!isFS()) enterFull().catch(function () {}); },
+      toggle: function () { btnFull.click(); },
+      isFS: isFS
+    };
     btnFull.addEventListener('click', function (e) {
       e.preventDefault();
       e.stopPropagation();

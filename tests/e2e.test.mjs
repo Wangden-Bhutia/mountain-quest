@@ -10,12 +10,15 @@ const BASE = process.env.MQ_URL || 'http://127.0.0.1:8765/mountain-quest/';
 const SHOTS = process.env.MQ_SHOTS || '/workspace/mountain-quest-shots/';
 fs.mkdirSync(SHOTS, { recursive: true });
 const VIEWS = { portrait: { width: 390, height: 844 }, landscape: { width: 844, height: 390 } };
+const ASPECTS = { '844x390': [844, 390], '915x412': [915, 412], '960x384': [960, 384], '667x375': [667, 375], '1024x768': [1024, 768] };
 let browser;
 test.before(async () => { browser = await chromium.launch(); });
 test.after(async () => { await browser.close(); });
 
 async function open(view, opts = {}) {
-  const ctx = await browser.newContext({ viewport: VIEWS[view], isMobile: true, hasTouch: true, deviceScaleFactor: 2, reducedMotion: opts.rm ? 'reduce' : 'no-preference' });
+  const ctx = await browser.newContext({ viewport: VIEWS[view], isMobile: true, hasTouch: true, deviceScaleFactor: 2, reducedMotion: opts.rm ? 'reduce' : 'no-preference', bypassCSP: !!opts.bypassCSP });
+  // headless Chromium would really enter full screen and then refuse viewport resizes
+  await ctx.addInitScript(() => { Element.prototype.requestFullscreen = function () { window.__fsReq = (window.__fsReq || 0) + 1; return Promise.resolve(); }; });
   if (opts.init) await ctx.addInitScript(opts.init);
   const page = await ctx.newPage();
   const ext = [], errors = [];
@@ -94,6 +97,7 @@ for (const view of Object.keys(VIEWS)) {
     await page.evaluate(() => window.__MQ.start(1)); await page.waitForTimeout(3600);
     assert.strictEqual((await st(page)).state, 'story'); await shot('06-story-card');
     await page.tap('#game'); await page.waitForTimeout(200);
+    if ((await st(page)).state === 'story') { await page.tap('#game'); await page.waitForTimeout(200); }
     assert.strictEqual((await st(page)).state, 'play');
 
     // a new-mechanic stage and the boss
@@ -282,5 +286,60 @@ test('desktop never sees the turn card', async () => {
   const page = await ctx.newPage(); await page.goto(BASE);
   await page.waitForFunction(() => window.__MQ && window.__MQ.state().menu === 'main');
   assert.strictEqual(await page.isVisible('#turn'), false);
+  await ctx.close();
+});
+
+for (const [name, [w, h]] of Object.entries(ASPECTS)) {
+  test(`edge to edge at ${name}: canvas covers the viewport, UI inside safe area`, async () => {
+    VIEWS[name] = { width: w, height: h };
+    const { ctx, page, errors } = await open(name);
+    const fsBefore = await page.evaluate(() => window.__fsReq || 0);
+    await page.tap('#mNew'); await page.waitForTimeout(2600);
+    assert.strictEqual(await page.evaluate(() => window.__fsReq || 0), fsBefore + 1, 'Start asked for full screen');
+    const c = await page.$eval('#game', el => { const r = el.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height, bw: el.width, bh: el.height }; });
+    assert.deepStrictEqual([c.x, c.y, c.w, c.h], [0, 0, w, h], 'canvas box = viewport');
+    assert.ok(Math.abs(c.bw / c.bh - w / h) < 0.01, 'backing store has the screen aspect (no letterbox)');
+    // no blank bars: every edge pixel row/column is painted with game art, not the page background
+    const buf = await page.screenshot({ path: `/workspace/mountain-quest-shots/fullscreen/play-${name}.png` });
+    const blank = await page.evaluate(async (b64) => {
+      const img = new Image(); img.src = 'data:image/png;base64,' + b64; await img.decode();
+      const cv = document.createElement('canvas'); cv.width = img.width; cv.height = img.height;
+      const g = cv.getContext('2d'); g.drawImage(img, 0, 0);
+      const d = g.getImageData(0, 0, cv.width, cv.height).data; let n = 0, tot = 0;
+      const at = (x, y) => { const i = (y * cv.width + x) * 4; return d[i] === 13 && d[i + 1] === 27 && d[i + 2] === 42; };
+      for (let y = 0; y < cv.height; y += 4) { tot += 2; if (at(0, y)) n++; if (at(cv.width - 1, y)) n++; }
+      for (let x = 0; x < cv.width; x += 4) { tot += 2; if (at(x, 0)) n++; if (at(x, cv.height - 1)) n++; }
+      return n / tot;
+    }, buf.toString('base64'));
+    assert.ok(blank < 0.02, `edge pixels showing the bare page background: ${(blank * 100).toFixed(1)}%`);
+    await noOverlap(page, '#ui .ctl', 'hud buttons ' + name);
+    await noOverlap(page, '#touch button', 'touch pads ' + name);
+    assert.deepStrictEqual(errors, []);
+    await ctx.close();
+  });
+}
+
+test('safe-area insets keep buttons clear of a notch (simulated 44px)', async () => {
+  VIEWS.notch = { width: 915, height: 412 };
+  const { ctx, page } = await open('notch', { bypassCSP: true, init: () => {
+    document.addEventListener('DOMContentLoaded', () => { const st = document.createElement('style'); st.textContent = ':root{--n:44px} #ui{right:calc(10px + 44px)!important} #touch{padding-left:calc(10px + 44px)!important;padding-right:calc(10px + 44px)!important} .safe-probe{padding:0 44px 0 44px!important}'; document.head.appendChild(st); });
+  } });
+  await page.tap('#mNew'); await page.waitForTimeout(500);
+  const left = await page.$eval('[data-k="left"]', b => b.getBoundingClientRect().left);
+  const right = await page.$eval('#btnFull', b => b.getBoundingClientRect().right);
+  assert.ok(left >= 44 && right <= 915 - 44, `${left} ${right}`);
+  await page.screenshot({ path: '/workspace/mountain-quest-shots/fullscreen/notch-sim-915x412.png' });
+  await ctx.close();
+});
+
+test('pause and settings have a full screen switch', async () => {
+  const { ctx, page } = await open('landscape');
+  await page.tap('#mNew'); await page.waitForTimeout(300);
+  await page.tap('#btnPause'); await page.waitForTimeout(150);
+  assert.ok(await page.isVisible('#menu [data-panel="pause"] [data-act="fullscreen"]'));
+  await axe(page, 'pause with full screen');
+  await page.screenshot({ path: '/workspace/mountain-quest-shots/fullscreen/pause-844x390.png' });
+  await page.tap('#menu [data-panel="pause"] [data-act="settings"]'); await page.waitForTimeout(150);
+  assert.ok(await page.isVisible('#sFs')); await axe(page, 'settings with full screen');
   await ctx.close();
 });

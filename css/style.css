@@ -212,3 +212,10 @@
   @keyframes turnphone { 0%, 25% { transform: rotate(0deg); } 55%, 85% { transform: rotate(90deg); } 100% { transform: rotate(0deg); } }
   body.rm .turn-phone { animation: none; transform: rotate(90deg); }
   @media (prefers-reduced-motion: reduce) { .turn-phone { animation: none; transform: rotate(90deg); } }
+
+  /* edge-to-edge: art fills the screen, UI keeps clear of notches and rounded corners */
+  .safe-probe { position: fixed; left: 0; top: 0; width: 0; height: 0; visibility: hidden; pointer-events: none;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  #app { height: 100vh; height: 100dvh; }
+  #touch { padding-left: max(18px, calc(10px + env(safe-area-inset-left))); padding-right: max(18px, calc(10px + env(safe-area-inset-right))); }
+  #menu { padding-left: max(14px, env(safe-area-inset-left)); padding-right: max(14px, env(safe-area-inset-right)); }

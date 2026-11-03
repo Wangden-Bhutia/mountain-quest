@@ -9,16 +9,37 @@
 
   var canvas = document.getElementById('game');
   var ctx = canvas.getContext('2d');
-  var DPR = Math.min(window.devicePixelRatio || 1, 2);
-  function sizeCanvas() {
-    var d = Math.min(window.devicePixelRatio || 1, 2);
-    if (d === DPR && canvas.width === Math.round(W * DPR)) return;   // avoid clearing the canvas on every resize
-    DPR = d;
-    canvas.width = Math.round(W * DPR);
-    canvas.height = Math.round(H * DPR);
+  // Full-screen "cover" view: the world is always 540 units tall. Wider screens
+  // (16:9 up to 21:9 and beyond) simply see more of the world left/right; taller
+  // screens (4:3) get 960 units wide and extra sky on top. Physics is untouched.
+  var DPR = 1, SCALE = 1, OFFY = 0, CSSW = 0, CSSH = 0;
+  var SAFE = { l: 0, r: 0, t: 0, b: 0 };
+  var probe = document.createElement('div');
+  probe.className = 'safe-probe';
+  document.body.appendChild(probe);
+  function readSafe() {
+    var cs = getComputedStyle(probe);
+    SAFE.l = parseFloat(cs.paddingLeft) || 0; SAFE.r = parseFloat(cs.paddingRight) || 0;
+    SAFE.t = parseFloat(cs.paddingTop) || 0; SAFE.b = parseFloat(cs.paddingBottom) || 0;
   }
-  canvas.width = Math.round(W * DPR); canvas.height = Math.round(H * DPR);
+  function sizeCanvas() {
+    var cw = canvas.clientWidth || PHYS.W, ch = canvas.clientHeight || H;
+    var d = Math.min(window.devicePixelRatio || 1, 2);
+    // keep the backing store under ~3.2 megapixels for steady frame rates
+    var maxPx = 3.2e6;
+    if (cw * ch * d * d > maxPx) d = Math.max(1, Math.sqrt(maxPx / (cw * ch)));
+    if (cw === CSSW && ch === CSSH && d === DPR) return;   // avoid clearing the canvas on every resize
+    CSSW = cw; CSSH = ch; DPR = d;
+    if (cw / ch >= PHYS.W / H) { SCALE = ch / H; W = cw / SCALE; OFFY = 0; }
+    else { SCALE = cw / PHYS.W; W = PHYS.W; OFFY = ch / SCALE - H; }
+    canvas.width = Math.round(cw * DPR);
+    canvas.height = Math.round(ch * DPR);
+    readSafe();
+    if (G && G.snow) setupSnow(G.theme || THEMES.meadow);
+  }
   window.addEventListener('resize', sizeCanvas);
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', sizeCanvas);
+  if (window.ResizeObserver) new ResizeObserver(function () { sizeCanvas(); }).observe(canvas);
 
   // ---------------------------------------------------------------- save data
   var SAVE_KEY = 'mountain-quest:v1';
@@ -329,12 +350,9 @@
   });
 
   function canvasPoint(e) {
-    var cw = canvas.clientWidth || W, ch = canvas.clientHeight || H;
-    var sc = Math.min(cw / W, ch / H);
-    var ox = (cw - W * sc) / 2, oy = (ch - H * sc) / 2;
     var px = (e.offsetX == null ? 0 : e.offsetX);
     var py = (e.offsetY == null ? 0 : e.offsetY);
-    return { x: (px - ox) / sc, y: (py - oy) / sc };
+    return { x: px / SCALE, y: py / SCALE - OFFY };
   }
 
   canvas.addEventListener('pointerdown', function (e) {
@@ -848,7 +866,7 @@
 
   function drawSky(camX, th) {
     ctx.fillStyle = themeSky(th);
-    ctx.fillRect(0, 0, W, H);
+    ctx.fillRect(0, -OFFY, W, H + OFFY);
 
     var sx = 800 - (camX * 0.04) % 200;
     var gr = ctx.createRadialGradient(sx, 90, 10, sx, 90, 150);
@@ -1548,7 +1566,7 @@
 
   function drawTitle() {
     ctx.fillStyle = 'rgba(8,22,34,0.42)';
-    ctx.fillRect(0, 0, W, H);
+    ctx.fillRect(0, -OFFY, W, H + OFFY);
 
     var bob = Math.sin(G.t * 2) * 4;
 
@@ -1595,7 +1613,7 @@
 
   function drawComplete() {
     ctx.fillStyle = 'rgba(8,22,34,0.55)';
-    ctx.fillRect(0, 0, W, H);
+    ctx.fillRect(0, -OFFY, W, H + OFFY);
     panel(W / 2 - 300, 110, 600, 320);
     txtShadow(G.world.tutorial ? 'TRAINING DONE!' : 'CHAPTER CLEAR!', W / 2, 176, 44, '#ffe89a', 'center');
     roundFace(W / 2, 234, 32);
@@ -1630,8 +1648,9 @@
   }
 
   function drawGameOver() {
+    GO_BTN[0].x = W / 2 - 236; GO_BTN[1].x = W / 2 + 12;
     ctx.fillStyle = 'rgba(8,22,34,0.62)';
-    ctx.fillRect(0, 0, W, H);
+    ctx.fillRect(0, -OFFY, W, H + OFFY);
     panel(W / 2 - 270, 130, 540, 296);
     txtShadow('OUT OF LIVES', W / 2, 186, 40, '#ffffff', 'center');
     txt('You had ' + coinsTxt(G.coins) + ' on this trail.', W / 2, 230, 20, 'rgba(255,255,255,0.9)', 'center', '600');
@@ -1641,7 +1660,7 @@
 
   function drawWin() {
     ctx.fillStyle = 'rgba(8,22,34,0.55)';
-    ctx.fillRect(0, 0, W, H);
+    ctx.fillRect(0, -OFFY, W, H + OFFY);
     panel(W / 2 - 290, 70, 580, 390);
     txtShadow(DATA.ENDING.title, W / 2, 124, 40, '#ffe89a', 'center');
     roundFace(W / 2, 196, 34);
@@ -1661,7 +1680,7 @@
 
   function drawPaused() {
     ctx.fillStyle = 'rgba(8,22,34,0.5)';
-    ctx.fillRect(0, 0, W, H);
+    ctx.fillRect(0, -OFFY, W, H + OFFY);
 
   }
 
@@ -1680,7 +1699,7 @@
   function drawStory() {
     var st = DATA.STORY[Math.max(0, G.storyIdx - 1)] || DATA.STORY[0];
     ctx.fillStyle = 'rgba(8,22,34,0.55)';
-    ctx.fillRect(0, 0, W, H);
+    ctx.fillRect(0, -OFFY, W, H + OFFY);
 
     var px = 110, py = 50, pw = 740, ph = 440;
     panel(px, py, pw, ph);
@@ -1719,8 +1738,10 @@
 
   // ---------------------------------------------------------------- render
   function render() {
-    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-    ctx.clearRect(0, 0, W, H);
+    sizeCanvas();
+    var k = DPR * SCALE;
+    ctx.setTransform(k, 0, 0, k, 0, OFFY * k);
+    ctx.clearRect(0, -OFFY, W, H + OFFY);
 
     var camX = Math.round(G.camX * 2) / 2;
     ctx.save();
@@ -1752,7 +1773,7 @@
     ctx.restore();
 
     if (G.state === 'play') {
-      drawHUD();
+      ctx.save(); ctx.translate(SAFE.l / SCALE, SAFE.t / SCALE - OFFY); drawHUD(); ctx.restore();
       if (G.banner > 0) {
         var a = Math.min(1, G.banner) * Math.min(1, (2.2 - G.banner) * 4);
         ctx.globalAlpha = Math.max(0, Math.min(1, a));
@@ -1770,10 +1791,10 @@
     } else if (G.state === 'story') {
       drawStory();
     } else if (G.state === 'complete') {
-      drawHUD();
+      ctx.save(); ctx.translate(SAFE.l / SCALE, SAFE.t / SCALE - OFFY); drawHUD(); ctx.restore();
       drawComplete();
     } else if (G.state === 'gameover') {
-      drawHUD();
+      ctx.save(); ctx.translate(SAFE.l / SCALE, SAFE.t / SCALE - OFFY); drawHUD(); ctx.restore();
       drawGameOver();
     } else if (G.state === 'win') {
       drawWin();
@@ -1783,7 +1804,7 @@
 
     if (G.flash > 0) {
       ctx.fillStyle = 'rgba(255,255,255,' + (G.flash * 0.9) + ')';
-      ctx.fillRect(0, 0, W, H);
+      ctx.fillRect(0, -OFFY, W, H + OFFY);
     }
   }
 
@@ -1907,8 +1928,9 @@
       var act = b.getAttribute('data-act');
       SFX.ui();
       switch (act) {
-        case 'continue': startChapter(SAVE.unlocked, true); break;
-        case 'new': startChapter(0, true); break;
+        case 'continue': firstFullscreen(); startChapter(SAVE.unlocked, true); break;
+        case 'new': firstFullscreen(); startChapter(0, true); break;
+        case 'fullscreen': if (window.__MQ_FS) window.__MQ_FS.toggle(); break;
         case 'chapters': api.show('chapters'); break;
         case 'settings': api.show('settings'); break;
         case 'credits': api.show('credits'); break;
@@ -1933,6 +1955,14 @@
     });
     return api;
   })();
+
+  // phones: go full screen on the first Start / Continue tap (needs a user gesture)
+  var fsTried = false;
+  function firstFullscreen() {
+    if (fsTried || !window.__TOUCH || !window.__MQ_FS) return;
+    fsTried = true;
+    window.__MQ_FS.enter();
+  }
 
   function syncChrome() {
     var b = document.body;
