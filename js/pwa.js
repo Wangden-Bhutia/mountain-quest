@@ -56,10 +56,18 @@
 
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === '127.0.0.1' || location.hostname === 'localhost')) {
     var hadController = !!navigator.serviceWorker.controller;
-    navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(function () {});
+    navigator.serviceWorker.register('./sw.js', { scope: './', updateViaCache: 'none' }).then(function (reg) {
+      // phones keep tabs alive for days: look for a new build whenever the game comes back
+      document.addEventListener('visibilitychange', function () { if (!document.hidden) reg.update().catch(function () {}); });
+    }).catch(function () {});
     navigator.serviceWorker.addEventListener('controllerchange', function () {
       // first install takes control quietly; later changes mean a new version is ready
-      if (hadController) toast('Update ready. It will load next time you open the game');
+      if (hadController) {
+        var st = window.__MQ && window.__MQ.state ? window.__MQ.state() : null;
+        var busy = st && st.state === 'play' && !st.paused;
+        if (busy) toast('Update ready. It will load next time you open the game');
+        else location.reload();   // not mid-run: switch to the new build now
+      }
       hadController = true;
     });
   }
