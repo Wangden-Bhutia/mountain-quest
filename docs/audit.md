@@ -81,3 +81,9 @@ Every item above marked [verified], plus:
 - deterministic enemies.
 
 The photo is kept, since it is the game's main character. It is flagged here for the owner.
+
+## v3 additions (5 more stages, install and offline)
+- Five chapters were inserted between Starlit Gorge and Storm Peak, so the boss and the ending still come last. The Gorge outro was rewritten to lead into them. Each one passes the solver and layout checks.
+- The save version is now 2, with a migration test for v1 saves.
+- PWA: manifest, generated service worker and install button. The CSP gains only `worker-src 'self'` and `manifest-src 'self'`.
+- Not verified: install on a real phone, and update behaviour across real deploys on a device.
