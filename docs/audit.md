@@ -87,3 +87,6 @@ The photo is kept, since it is the game's main character. It is flagged here for
 - The save version is now 2, with a migration test for v1 saves.
 - PWA: manifest, generated service worker and install button. The CSP gains only `worker-src 'self'` and `manifest-src 'self'`.
 - Not verified: install on a real phone, and update behaviour across real deploys on a device.
+
+## v4: landscape first
+- Portrait turn card, orientation lock attempt and manifest `landscape`. Real-phone lock behaviour is untested.

@@ -67,6 +67,11 @@
     document.addEventListener('fullscreenchange', syncFS);
     document.addEventListener('webkitfullscreenchange', syncFS);
 
+    window.__MQ_FS = {
+      enter: function () { if (!isFS()) enterFull().catch(function () {}); },
+      toggle: function () { btnFull.click(); },
+      isFS: isFS
+    };
     btnFull.addEventListener('click', function (e) {
       e.preventDefault();
       e.stopPropagation();
@@ -93,6 +98,7 @@
     function setRotate(on, msg) {
       rotated = on;
       applyRotate();
+      if (window.__MQ_TURN) window.__MQ_TURN();
       if (msg) toast(msg);
     }
 
@@ -154,6 +160,45 @@
         btnRot.click();
       }
     });
+
+    // ---- landscape first
+    // Try to lock landscape on the first tap and whenever full screen starts.
+    // Chrome only allows the lock in full screen or an installed app, so it may fail quietly.
+    function tryLock() {
+      var so = screen.orientation;
+      if (!so || !so.lock || !document.body.classList.contains('touch')) return;
+      try { var p = so.lock('landscape'); if (p && p.catch) p.catch(function () {}); } catch (err) {}
+    }
+    var lockedOnce = false;
+    function firstGesture() {
+      if (lockedOnce) return; lockedOnce = true;
+      if (isFS() || window.matchMedia('(display-mode: fullscreen)').matches || window.matchMedia('(display-mode: standalone)').matches) tryLock();
+    }
+    document.addEventListener('pointerdown', firstGesture, true);
+    document.addEventListener('fullscreenchange', function () { if (isFS()) tryLock(); });
+
+    var turnEl = document.getElementById('turn');
+    var PORTRAIT_KEY = 'mountain-quest:portrait-ok';
+    function portraitOK() { try { return localStorage.getItem(PORTRAIT_KEY) === '1'; } catch (err) { return !!window.__mqPortraitOK; } }
+    function syncTurn() {
+      var need = document.body.classList.contains('touch') && window.innerHeight > window.innerWidth &&
+        !rotated && !portraitOK();
+      if (need === !turnEl.hidden) return;
+      turnEl.hidden = !need;
+      document.body.classList.toggle('turn-open', need);
+      document.dispatchEvent(new CustomEvent('mq-turn', { detail: { open: need } }));
+      if (need) { try { document.getElementById('turnRotate').focus({ preventScroll: true }); } catch (err) {} }
+    }
+    window.__MQ_TURN = syncTurn;
+    document.getElementById('turnAnyway').addEventListener('click', function () {
+      try { localStorage.setItem(PORTRAIT_KEY, '1'); } catch (err) { window.__mqPortraitOK = true; }
+      syncTurn();
+      toast('Portrait it is. The rotate button turns the game any time');
+    });
+    document.getElementById('turnRotate').addEventListener('click', function () { btnRot.click(); });
+    window.addEventListener('resize', syncTurn);
+    window.addEventListener('orientationchange', function () { setTimeout(syncTurn, 260); });
+    syncTurn();
 
     // a gentle nudge for phones held upright
     if (document.body.classList.contains('touch')) {

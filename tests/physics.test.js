@@ -50,7 +50,7 @@ test('fixed timestep: identical result whatever the screen refresh rate', () => 
 test('spikes hurt, springs launch high', () => {
   const S = P.newState(flat({ spikes: [[200, 60]] })); settle(S);
   assert.strictEqual(run(S, { right: true }, 2), 'hurt');
-  const T = P.newState(flat({ springs: [[150]] })); settle(T);
+  const T = P.newState(flat({ springs: [[320]] })); settle(T);
   let minY = 1e9; for (let i = 0; i < 240; i++) { P.step(T, { right: i < 50 }, P.STEP); minY = Math.min(minY, T.p.y + T.p.h); }
   assert.ok(GY - minY > 300, 'spring height ' + (GY - minY));
 });

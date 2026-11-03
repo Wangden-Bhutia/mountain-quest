@@ -60,3 +60,12 @@ npm run solve          # prints the solver's finishing time for each stage
 - `docs/audit.md`: the audit of the original.
 
 The GitHub Actions workflow runs every test, then deploys only `index.html`, `css/` and `js/` to Pages.
+
+## Landscape first
+- The manifest asks for `orientation: landscape`, so the installed app opens sideways on Android.
+- In the browser, the game tries `screen.orientation.lock('landscape')` when full screen starts. This only works where Chrome allows it, and it fails quietly elsewhere.
+- On a touch phone held upright, a full-screen "Turn your phone sideways" card replaces the small strip view, and the game pauses while it is shown. The card has two buttons:
+  - "Rotate the game for me" uses the manual rotate, for phones with auto-rotate off.
+  - "Play in portrait anyway" is remembered (`mountain-quest:portrait-ok`).
+- With reduced motion, the phone in the card's art is shown already turned instead of animating. Desktop browsers never see the card.
+- The hero now starts at x=190 so the left touch pads don't cover her.

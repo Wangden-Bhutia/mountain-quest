@@ -83,7 +83,7 @@
         <button type="button" class="mbtn primary" data-act="resume">Resume</button>
         <button type="button" class="mbtn" data-act="restart">Restart chapter</button>
         <button type="button" class="mbtn" data-act="settings">Settings</button>
-        <button type="button" class="mbtn" data-act="help">How to play</button>
+        <button type="button" class="mbtn" data-act="fullscreen">Full screen</button>
         <button type="button" class="mbtn" data-act="quit">Quit to title</button>
       </section>
       <section class="mpanel" data-panel="chapters" aria-labelledby="hChap" hidden>
@@ -96,6 +96,7 @@
         <div class="row"><span id="lMute">Sound</span><button type="button" class="tog" id="sMute" data-act="mute" aria-labelledby="lMute sMute">On</button></div>
         <div class="row"><span id="lMusic">Music</span><button type="button" class="tog" id="sMusic" data-act="music" aria-labelledby="lMusic sMusic">On</button></div>
         <div class="row"><span id="lSfx">Sound effects</span><button type="button" class="tog" id="sSfx" data-act="sfx" aria-labelledby="lSfx sSfx">On</button></div>
+        <div class="row"><span id="lFs">Full screen</span><button type="button" class="tog" id="sFs" data-act="fullscreen" aria-labelledby="lFs sFs">Switch</button></div>
         <div class="row"><span id="lMotion">Motion</span><button type="button" class="tog" id="sMotion" data-act="motion" aria-labelledby="lMotion sMotion">Auto (system)</button></div>
         <p id="sStore" class="muted" hidden>This browser is not letting the game save, so progress will be lost when you close it.</p>
         <div class="gap"></div>
@@ -129,6 +130,28 @@
         <button type="button" class="mbtn" data-act="back">Back</button>
       </section>
     </div>
+  </div>
+
+  <div id="turn" role="dialog" aria-modal="true" aria-labelledby="turnTitle" hidden>
+    <div class="turn-art" aria-hidden="true">
+      <svg viewBox="0 0 220 150" width="220" height="150">
+        <path d="M0 150 L60 70 L95 110 L140 40 L220 150 Z" fill="#6d8399"/>
+        <path d="M140 40 L124 64 L134 60 L140 70 L147 60 L156 64 Z" fill="#ffffff"/>
+        <path d="M0 150 L50 95 L90 150 Z" fill="#54996a"/>
+        <g class="turn-phone">
+          <rect x="82" y="28" width="56" height="96" rx="10" fill="#17242f" stroke="#ffd0e0" stroke-width="4"/>
+          <rect x="90" y="40" width="40" height="72" rx="3" fill="#8fc7ea"/>
+          <circle cx="110" cy="118" r="3" fill="#ffd0e0"/>
+        </g>
+        <path class="turn-arrow" d="M152 30 A52 52 0 0 1 176 76" fill="none" stroke="#ffe89a" stroke-width="5" stroke-linecap="round"/>
+        <path class="turn-arrow" d="M168 74 L177 80 L182 69" fill="none" stroke="#ffe89a" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <h2 id="turnTitle">Turn your phone sideways</h2>
+    <p>Mountain Quest plays best in landscape. Rotate your phone and the game carries on.</p>
+    <p class="muted">Auto-rotate off? Use "Rotate the game for me".</p>
+    <button type="button" class="mbtn primary" id="turnRotate">Rotate the game for me</button>
+    <button type="button" class="mbtn" id="turnAnyway">Play in portrait anyway</button>
   </div>
 </div>
 <script src="js/shell.js"></script>

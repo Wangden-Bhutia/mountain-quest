@@ -192,3 +192,30 @@
     .mpanel[data-panel="pause"] .mbtn { margin: 0; }
     .mpanel[data-panel="pause"] .mbtn:last-child { grid-column: 1 / -1; }
   }
+
+  /* landscape-first: full-screen "turn your phone" card on touch phones held upright */
+  #turn {
+    position: fixed; inset: 0; z-index: 60;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 24px 22px calc(24px + env(safe-area-inset-bottom));
+    background: linear-gradient(#8fc7ea, #c3e2f5 45%, #0d1b2a 46%, #0d1b2a);
+    color: #fff; text-align: center;
+  }
+  #turn[hidden] { display: none; }
+  #turn .turn-art { margin: 0 0 18px; }
+  #turn h2 { margin: 0 0 10px; font-size: 26px; color: #ffe89a; }
+  #turn p { margin: 0 0 10px; font-size: 16px; line-height: 1.45; max-width: 330px; }
+  #turn p.muted { color: #c9d4dc; font-size: 14px; }
+  #turn .mbtn { max-width: 330px; }
+  body.turn-open #stage, body.turn-open #ui { visibility: hidden; }
+  .turn-phone { transform-origin: 110px 76px; animation: turnphone 2.6s ease-in-out infinite; }
+  @keyframes turnphone { 0%, 25% { transform: rotate(0deg); } 55%, 85% { transform: rotate(90deg); } 100% { transform: rotate(0deg); } }
+  body.rm .turn-phone { animation: none; transform: rotate(90deg); }
+  @media (prefers-reduced-motion: reduce) { .turn-phone { animation: none; transform: rotate(90deg); } }
+
+  /* edge-to-edge: art fills the screen, UI keeps clear of notches and rounded corners */
+  .safe-probe { position: fixed; left: 0; top: 0; width: 0; height: 0; visibility: hidden; pointer-events: none;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  #app { height: 100vh; height: 100dvh; }
+  #touch { padding-left: max(18px, calc(10px + env(safe-area-inset-left))); padding-right: max(18px, calc(10px + env(safe-area-inset-right))); }
+  #menu { padding-left: max(14px, env(safe-area-inset-left)); padding-right: max(14px, env(safe-area-inset-right)); }
