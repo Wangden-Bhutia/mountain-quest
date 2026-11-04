@@ -16,12 +16,13 @@
   var SAFE = { l: 0, r: 0, t: 0, b: 0 };
   var probe = document.createElement('div');
   probe.className = 'safe-probe';
-  document.body.appendChild(probe);
+  (document.getElementById('stage') || document.body).appendChild(probe);
   function readSafe() {
     var cs = getComputedStyle(probe);
     SAFE.l = parseFloat(cs.paddingLeft) || 0; SAFE.r = parseFloat(cs.paddingRight) || 0;
     SAFE.t = parseFloat(cs.paddingTop) || 0; SAFE.b = parseFloat(cs.paddingBottom) || 0;
   }
+  window.__MQ_RESAFE = readSafe;   // shell.js calls this when the stage insets change (rotate)
   function sizeCanvas() {
     var cw = canvas.clientWidth || PHYS.W, ch = canvas.clientHeight || H;
     var d = Math.min(window.devicePixelRatio || 1, 2);
@@ -1974,6 +1975,30 @@
   }
 
   // the turn-your-phone card pauses the game while it is up
+  // ---------------------------------------------------------------- Android back
+  // Back should pause or step back one menu, not leave the game. A history entry
+  // is added during a tap (Chrome skips entries made without one) whenever there
+  // is something to step back from; popstate then handles it here.
+  function backGuardNeeded() {
+    return G.state === 'play' || G.state === 'gameover' || G.state === 'story' || (UI.open && UI.open !== 'main');
+  }
+  function armBack() {
+    if (backGuardNeeded() && !(history.state && history.state.mq)) {
+      try { history.pushState({ mq: 1 }, ''); } catch (e) {}
+    }
+  }
+  // bubble phase: runs after the tapped button has opened its menu or started play
+  document.addEventListener('pointerup', armBack);
+  document.addEventListener('click', armBack);
+  document.addEventListener('keyup', armBack);
+  window.addEventListener('popstate', function () {
+    if (UI.open && UI.open !== 'main' && UI.open !== 'pause') UI.back();
+    else if (G.state === 'play' && !G.paused) togglePause();
+    else if (G.state === 'gameover') endToTitle();
+    else if (G.state === 'play' && G.paused) toast('Paused. Press back again to leave the game');
+    window.__mqBacks = (window.__mqBacks || 0) + 1;
+  });
+
   document.addEventListener('mq-turn', function (e) { if (e.detail && e.detail.open) { releaseAll(); autoPause(); } });
   document.getElementById('btnPause').addEventListener('click', function (e) {
     e.preventDefault(); e.stopPropagation(); togglePause();
