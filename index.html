@@ -19,12 +19,18 @@
 <div id="app">
   <div id="stage">
     <canvas id="game" width="960" height="540" role="img" aria-label="Mountain Quest game screen"></canvas>
-    <div id="touch">
-      <div class="pad">
+    <div id="touch" data-mode="stick">
+      <div class="stick" id="stick" role="application" aria-label="Move with joystick">
+        <div class="stick-ring" aria-hidden="true"></div>
+        <div class="stick-knob" id="stickKnob" aria-hidden="true"></div>
+      </div>
+      <div class="pad" id="padButtons" hidden>
         <button type="button" data-k="left" aria-label="Move left">&#9664;</button>
         <button type="button" data-k="right" aria-label="Move right">&#9654;</button>
       </div>
-      <button type="button" class="jump" data-k="jump" aria-label="Jump">JUMP</button>
+      <div class="actions">
+        <button type="button" class="jump" data-k="jump" aria-label="Jump">JUMP</button>
+      </div>
     </div>
     <div id="toast" role="status" aria-live="polite"></div>
 
@@ -100,6 +106,7 @@
         <div class="row"><span id="lSfx">Sound effects</span><button type="button" class="tog" id="sSfx" data-act="sfx" aria-labelledby="lSfx sSfx">On</button></div>
         <div class="row"><span id="lFs">Full screen</span><button type="button" class="tog" id="sFs" data-act="fullscreen" aria-labelledby="lFs sFs">Switch</button></div>
         <div class="row"><span id="lMotion">Motion</span><button type="button" class="tog" id="sMotion" data-act="motion" aria-labelledby="lMotion sMotion">Auto (system)</button></div>
+        <div class="row"><span id="lCtrl">Controls</span><button type="button" class="tog" id="sCtrl" data-act="controls" aria-labelledby="lCtrl sCtrl">Joystick</button></div>
         <p id="sStore" class="muted" hidden>This browser is not letting the game save, so progress will be lost when you close it.</p>
         <div class="gap"></div>
         <button type="button" class="mbtn" data-act="reset">Reset progress</button>
@@ -108,7 +115,7 @@
       <section class="mpanel" data-panel="help" aria-labelledby="hHelp" hidden>
         <h2 id="hHelp">How to play</h2>
         <ul class="keys">
-          <li>&#9664; &#9654; to walk, JUMP to jump. Hold JUMP to jump higher.</li>
+          <li>Joystick (or &#9664; &#9654;) to walk, JUMP to jump. Hold JUMP to jump higher.</li>
           <li>Keyboard: arrows or A/D, Space/W/Up to jump, P or Esc to pause, M for sound, F full screen.</li>
           <li>Bounce on grumps to beat them. Touching them from the side costs a life.</li>
           <li>Cracked stones fall soon after you step on them. Pink springs throw you high.</li>
@@ -158,6 +165,7 @@
 <script src="js/shell.js"></script>
 <script src="js/assets.js"></script>
 <script src="js/physics.js"></script>
+<script src="js/stick.js"></script>
 <script src="js/data.js"></script>
 <script src="js/game.js"></script>
 <script src="js/pwa.js"></script>

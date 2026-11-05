@@ -47,7 +47,7 @@
   var storageOK = true, storageWarned = false;
   function defaults() {
     return { v: 2, unlocked: 0, best: {}, finished: false,
-      settings: { muted: false, sfx: true, music: true, motion: 'auto' } };
+      settings: { muted: false, sfx: true, music: true, motion: 'auto', controls: 'stick' } };
   }
   function loadSave() {
     var d = defaults();
@@ -75,6 +75,7 @@
         d.settings.sfx = s.settings.sfx !== false;
         d.settings.music = s.settings.music !== false;
         d.settings.motion = ['auto', 'on', 'off'].indexOf(s.settings.motion) >= 0 ? s.settings.motion : 'auto';
+        d.settings.controls = s.settings.controls === 'buttons' ? 'buttons' : 'stick';
       }
     } catch (e) { storageOK = false; }
     return d;
@@ -318,6 +319,18 @@
     held.left = held.right = held.jump = false;
     var on = document.querySelectorAll('#touch button.on');
     for (var i = 0; i < on.length; i++) on[i].classList.remove('on');
+    if (window.__MQ_STICK_UI) window.__MQ_STICK_UI.reset();
+  }
+
+  function syncControlsMode() {
+    var mode = SAVE.settings.controls === 'buttons' ? 'buttons' : 'stick';
+    var touch = document.getElementById('touch');
+    if (touch) touch.setAttribute('data-mode', mode);
+    var pad = document.getElementById('padButtons');
+    if (pad) pad.hidden = mode !== 'buttons';
+    var stick = document.getElementById('stick');
+    if (stick) stick.setAttribute('aria-hidden', mode === 'buttons' ? 'true' : 'false');
+    releaseAll();
   }
 
   var KEYMAP = {
@@ -400,11 +413,66 @@
         b.addEventListener('contextmenu', function (e) { e.preventDefault(); });
       })(btns[i]);
     }
+
+    // Round analog stick: one finger moves, JUMP stays free for a second finger.
+    var stick = document.getElementById('stick');
+    var knob = document.getElementById('stickKnob');
+    if (!stick || !knob || !window.MQ_STICK) return;
+    var stickPtr = null, stickOrigin = null;
+    function stickRadius() { return stick.getBoundingClientRect().width / 2; }
+    function setKnob(dx, dy) {
+      knob.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+    }
+    function applyStick(dx, dy) {
+      var m = MQ_STICK.map(dx, dy, stickRadius());
+      held.left = !!m.left; held.right = !!m.right;
+      if (m.left) onAction('left');
+      if (m.right) onAction('right');
+      stick.__mq = m;
+    }
+    function resetStick() {
+      stickPtr = null; stickOrigin = null;
+      stick.classList.remove('active');
+      setKnob(0, 0);
+      held.left = false; held.right = false;
+      stick.__mq = { nx: 0, ny: 0, mag: 0, left: false, right: false };
+    }
+    window.__MQ_STICK_UI = { reset: resetStick, active: function () { return stickPtr != null; } };
+    stick.addEventListener('pointerdown', function (e) {
+      if (SAVE.settings.controls === 'buttons') return;
+      e.preventDefault(); e.stopPropagation();
+      unlockAudio();
+      try { stick.setPointerCapture(e.pointerId); } catch (err) {}
+      stickPtr = e.pointerId;
+      var r = stick.getBoundingClientRect();
+      stickOrigin = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+      stick.classList.add('active');
+      var dx = e.clientX - stickOrigin.x, dy = e.clientY - stickOrigin.y;
+      var c = MQ_STICK.clampKnob(dx, dy, stickRadius());
+      setKnob(c.dx, c.dy); applyStick(c.dx, c.dy);
+    });
+    stick.addEventListener('pointermove', function (e) {
+      if (stickPtr !== e.pointerId || !stickOrigin) return;
+      e.preventDefault();
+      var dx = e.clientX - stickOrigin.x, dy = e.clientY - stickOrigin.y;
+      var c = MQ_STICK.clampKnob(dx, dy, stickRadius());
+      setKnob(c.dx, c.dy); applyStick(c.dx, c.dy);
+    });
+    var stickUp = function (e) {
+      if (e && stickPtr != null && e.pointerId !== stickPtr) return;
+      if (e) e.preventDefault();
+      resetStick();
+    };
+    stick.addEventListener('pointerup', stickUp);
+    stick.addEventListener('pointercancel', stickUp);
+    stick.addEventListener('lostpointercapture', stickUp);
+    stick.addEventListener('contextmenu', function (e) { e.preventDefault(); });
   })();
+  syncControlsMode();
 
   // ---------------------------------------------------------------- tutorial
   var TUTORIAL = [
-    { text: 'Tap  ▶  to walk right', kb: 'Press  →  to walk right', btn: 'right', done: function () { return G.p.x > 330; } },
+    { text: 'Slide the stick right to walk', kb: 'Press  →  to walk right', btn: 'right', done: function () { return G.p.x > 330; } },
     { text: 'Tap  JUMP  to jump', kb: 'Press  SPACE  to jump', btn: 'jump', done: function () { return G.jumped; } },
     { text: 'Run into the coins to collect them', btn: 'right', done: function () { return G.coins >= 3; } },
     { text: 'Jump across the water', btn: 'jump', done: function () { return G.p.x > 800; } },
@@ -1290,9 +1358,15 @@
     try {
       var all = document.querySelectorAll('[data-k]');
       for (var i = 0; i < all.length; i++) all[i].classList.remove('hint');
+      var stick = document.getElementById('stick');
+      if (stick) stick.classList.remove('hint');
       if (!G.world || !G.world.tutorial || G.state !== 'play') return;
       var st = TUTORIAL[G.tutStep];
       if (!st || !st.btn) return;
+      if ((st.btn === 'left' || st.btn === 'right') && SAVE.settings.controls !== 'buttons') {
+        if (stick) stick.classList.add('hint');
+        return;
+      }
       var b = document.querySelector('[data-k="' + st.btn + '"]');
       if (b) b.classList.add('hint');
     } catch (e) {}
@@ -1607,7 +1681,7 @@
     ctx.drawImage(sprite, mx - sw / 2, hipY + 8 - sh, sw, sh);
 
     var hint = window.__TOUCH
-      ? 'on-screen buttons move and jump  ·  rotate button for landscape'
+      ? 'joystick moves, JUMP jumps  ·  rotate button for landscape'
       : '← →  move  ·  SPACE  jump  ·  P  pause  ·  M  sound  ·  F  full screen';
     txt(hint, tx, 520, 13, 'rgba(255,255,255,0.85)', 'center', '600');
   }
@@ -1876,6 +1950,8 @@
         setToggle('sMute', !SAVE.settings.muted);
         var m = document.getElementById('sMotion');
         m.textContent = { auto: 'Auto (system)', on: 'Reduced', off: 'Full' }[SAVE.settings.motion];
+        var c = document.getElementById('sCtrl');
+        if (c) c.textContent = SAVE.settings.controls === 'buttons' ? 'Buttons' : 'Joystick';
         document.getElementById('sStore').hidden = storageOK;
       }
       if (name === 'credits') {
@@ -1947,6 +2023,9 @@
         case 'motion':
           SAVE.settings.motion = { auto: 'on', on: 'off', off: 'auto' }[SAVE.settings.motion];
           writeSave(); syncMotion(); setupSnow(G.theme || THEMES.meadow); render('settings'); break;
+        case 'controls':
+          SAVE.settings.controls = SAVE.settings.controls === 'buttons' ? 'stick' : 'buttons';
+          writeSave(); syncControlsMode(); render('settings'); break;
         case 'reset':
           if (window.confirm('Reset all progress? Your settings stay.')) {
             var keep = SAVE.settings; SAVE = defaults(); SAVE.settings = keep; writeSave(); toast('Progress reset'); render('settings');
@@ -2012,7 +2091,7 @@
   };
   // test hooks (read-only views + a few safe actions) used by tests/e2e.spec.js
   window.__MQ = {
-    state: function () { return { turn: document.body.classList.contains('turn-open'), state: G.state, idx: G.idx, lives: G.lives, coins: G.coins, paused: G.paused, x: G.p ? G.p.x : null, menu: UI.open, rm: RM, held: { l: held.left, r: held.right, j: held.jump }, audio: AC ? AC.state : 'none', save: SAVE }; },
+    state: function () { return { turn: document.body.classList.contains('turn-open'), state: G.state, idx: G.idx, lives: G.lives, coins: G.coins, paused: G.paused, x: G.p ? G.p.x : null, menu: UI.open, rm: RM, held: { l: held.left, r: held.right, j: held.jump }, controls: SAVE.settings.controls, stick: (document.getElementById('stick') && document.getElementById('stick').__mq) || null, audio: AC ? AC.state : 'none', save: SAVE }; },
     start: function (i) { startChapter(i, true); },
     load: function (i) { UI.close(); G.lives = 3; loadLevel(i); },
     win: function () { if (G.state === 'play') completeLevel(); },

@@ -47,6 +47,22 @@ async function noOverlap(page, sel, label) {
   }
 }
 
+const JOY_SHOTS = SHOTS.replace(/\/?$/, '/') + 'joystick/';
+fs.mkdirSync(JOY_SHOTS, { recursive: true });
+
+async function dragStick(page, dx, dy) {
+  const box = await page.$eval('#stick', e => { const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, r: r.width / 2 }; });
+  await page.dispatchEvent('#stick', 'pointerdown', { bubbles: true, cancelable: true, pointerId: 41, pointerType: 'touch', clientX: box.x, clientY: box.y, buttons: 1 });
+  await page.dispatchEvent('#stick', 'pointermove', { bubbles: true, cancelable: true, pointerId: 41, pointerType: 'touch', clientX: box.x + dx * box.r, clientY: box.y + dy * box.r, buttons: 1 });
+  await page.waitForTimeout(40);
+  return box;
+}
+async function releaseStick(page) {
+  await page.dispatchEvent('#stick', 'pointerup', { bubbles: true, cancelable: true, pointerId: 41, pointerType: 'touch', clientX: 0, clientY: 0 });
+  await page.waitForTimeout(40);
+}
+
+
 for (const view of Object.keys(VIEWS)) {
   test(`${view}: smoke, menus, axe, overlap, screenshots`, async () => {
     const { ctx, page, ext, errors } = await open(view);
@@ -74,15 +90,13 @@ for (const view of Object.keys(VIEWS)) {
     let s = await st(page);
     assert.strictEqual(s.state, 'play'); assert.strictEqual(s.audio, 'running', 'audio unlocked by the tap');
     await noOverlap(page, '#ui .ctl', 'hud buttons');
-    await noOverlap(page, '#touch button', 'touch pads');
-    // hold the right pad for a second: the hero walks right
-    const r = await page.$('[data-k="right"]'); const bb = await r.boundingBox();
-    await page.touchscreen.tap(bb.x + bb.width / 2, bb.y + bb.height / 2);
+    await noOverlap(page, '#touch button:not([hidden])', 'touch pads');
+    // hold the stick right for a second: the hero walks right
     const x0 = (await st(page)).x;
-    await r.dispatchEvent('pointerdown', { pointerId: 7, isPrimary: true });
+    await dragStick(page, 0.8, 0);
     await page.waitForTimeout(900);
-    assert.ok((await st(page)).x > x0 + 150, 'moved right while held');
-    await r.dispatchEvent('pointerup', { pointerId: 7 });
+    assert.ok((await st(page)).x > x0 + 150, 'moved right while stick held');
+    await releaseStick(page);
     await page.waitForTimeout(400);
     assert.strictEqual((await st(page)).held.r, false);
     await shot('04-gameplay');
@@ -190,8 +204,7 @@ test('offline: load once, go offline, reload and play', async () => {
   await page.reload();
   await page.waitForFunction(() => window.__MQ && window.__MQ.state().menu === 'main');
   await page.tap('#mNew'); await page.waitForTimeout(300);
-  const r = await page.$('[data-k="right"]');
-  await r.dispatchEvent('pointerdown', { pointerId: 3 }); await page.waitForTimeout(800); await r.dispatchEvent('pointerup', { pointerId: 3 });
+  await dragStick(page, 0.8, 0); await page.waitForTimeout(800); await releaseStick(page);
   const s = await st(page);
   assert.strictEqual(s.state, 'play'); assert.ok(s.x > 300, 'moved while offline');
   // a deep link also falls back to the cached game
@@ -269,9 +282,9 @@ test('landscape first: portrait shows the turn card, rotating dismisses it, play
   await page.tap('#mNew'); await page.waitForTimeout(2600);
   await page.screenshot({ path: `${SHOTS}20-landscape-play-landscape.png` });
   // hero stays clear of the left pads at the start
-  const pads = await page.$eval('[data-k="right"]', b => b.getBoundingClientRect().right);
-  const heroX = await page.evaluate(() => { const c = document.getElementById('game').getBoundingClientRect(); const sc = Math.min(c.width / 960, c.height / 540); const ox = c.x + (c.width - 960 * sc) / 2; const s = window.__MQ.state(); return ox + (s.x - 0) * sc; });
-  assert.ok(heroX > pads, `hero ${heroX} right of pads ${pads}`);
+  const pads = await page.$eval('#stick', b => b.getBoundingClientRect().right);
+  const heroX = await page.evaluate(() => { const c = document.getElementById('game').getBoundingClientRect(); const s = window.__MQ.state(); const sc = c.height / 540; return c.x + s.x * sc; });
+  assert.ok(heroX > pads - 40, `hero ${heroX} clear of stick ${pads}`);
   // back to portrait mid-game: card returns and the game pauses
   await page.setViewportSize(VIEWS.portrait); await page.waitForTimeout(300);
   let s = await st(page); assert.ok(s.turn && s.paused, 'paused under the card');
@@ -317,7 +330,7 @@ for (const [name, [w, h]] of Object.entries(ASPECTS)) {
     }, buf.toString('base64'));
     assert.ok(blank < 0.02, `edge pixels showing the bare page background: ${(blank * 100).toFixed(1)}%`);
     await noOverlap(page, '#ui .ctl', 'hud buttons ' + name);
-    await noOverlap(page, '#touch button', 'touch pads ' + name);
+    await noOverlap(page, '#touch button:not([hidden])', 'touch pads ' + name);
     assert.deepStrictEqual(errors, []);
     await ctx.close();
   });
@@ -329,7 +342,7 @@ test('safe-area insets keep buttons clear of a notch (simulated 44px)', async ()
     document.addEventListener('DOMContentLoaded', () => { const st = document.createElement('style'); st.textContent = ':root{--n:44px} #ui{right:calc(10px + 44px)!important} #touch{padding-left:calc(10px + 44px)!important;padding-right:calc(10px + 44px)!important} .safe-probe{padding:0 44px 0 44px!important}'; document.head.appendChild(st); });
   } });
   await page.tap('#mNew'); await page.waitForTimeout(500);
-  const left = await page.$eval('[data-k="left"]', b => b.getBoundingClientRect().left);
+  const left = await page.$eval('#stick', b => b.getBoundingClientRect().left);
   const right = await page.$eval('#btnFull', b => b.getBoundingClientRect().right);
   assert.ok(left >= 44 && right <= 915 - 44, `${left} ${right}`);
   await page.screenshot({ path: `${FS_SHOTS}notch-sim-915x412.png` });
@@ -354,7 +367,7 @@ fs.mkdirSync(STATUS_SHOTS, { recursive: true });
 async function rotatedRects(page) {
   return page.evaluate(() => {
     const vis = e => e.offsetParent !== null && getComputedStyle(e).visibility !== 'hidden';
-    return [...document.querySelectorAll('#touch button, #ui .ctl')].filter(vis).map(e => {
+    return [...document.querySelectorAll('#touch button, #stick, #ui .ctl')].filter(vis).map(e => {
       const r = e.getBoundingClientRect();
       return { id: e.id || e.dataset.k, top: r.top, left: r.left, right: r.right, bottom: r.bottom };
     });
@@ -424,7 +437,7 @@ test('Android back pauses play and steps back through menus without leaving', as
   await page.evaluate(() => history.back()); await page.waitForTimeout(300);
   assert.strictEqual((await st(page)).menu, 'main', 'back from settings goes to the main menu');
   await page.tap('#mNew'); await page.waitForTimeout(2600);
-  await page.tap('[data-k="right"]', { force: true }); await page.waitForTimeout(100);
+  await dragStick(page, 0.7, 0); await page.waitForTimeout(100);
   assert.strictEqual((await st(page)).state, 'play');
   await page.evaluate(() => history.back()); await page.waitForTimeout(300);
   const s = await st(page);
@@ -441,5 +454,73 @@ test('settings leads with a prominent Install app button when the browser offers
   assert.match(first, /^install\|.*primary/);
   assert.ok(await page.isVisible('#menu [data-panel="settings"] .install-tip'));
   await axe(page, 'settings with install');
+  await ctx.close();
+});
+
+
+// ---- round joystick
+
+test('joystick landscape: dead zone, right walk, release resets, multi-touch with JUMP', async () => {
+  const { ctx, page, errors } = await open('landscape');
+  assert.strictEqual((await st(page)).controls, 'stick');
+  assert.strictEqual(await page.getAttribute('#touch', 'data-mode'), 'stick');
+  await page.tap('#mNew'); await page.waitForTimeout(2600);
+  await dragStick(page, 0.1, 0); // inside dead zone
+  let h = await st(page);
+  assert.strictEqual(h.held.l, false); assert.strictEqual(h.held.r, false);
+  await releaseStick(page);
+  await dragStick(page, 0.7, 0);
+  h = await st(page);
+  assert.strictEqual(h.held.r, true); assert.strictEqual(h.held.l, false);
+  // second finger on JUMP while stick is held (multi-touch)
+  await page.dispatchEvent('[data-k="jump"]', 'pointerdown', { bubbles: true, cancelable: true, pointerId: 42, pointerType: 'touch', clientX: 800, clientY: 300, buttons: 1 });
+  await page.waitForTimeout(40);
+  h = await st(page);
+  assert.strictEqual(h.held.r, true); assert.strictEqual(h.held.j, true);
+  await page.dispatchEvent('[data-k="jump"]', 'pointerup', { bubbles: true, cancelable: true, pointerId: 42, pointerType: 'touch' });
+  await releaseStick(page);
+  h = await st(page);
+  assert.strictEqual(h.held.r, false); assert.strictEqual(h.held.l, false); assert.strictEqual(h.held.j, false);
+  await page.screenshot({ path: `${JOY_SHOTS}landscape-844x390.png` });
+  assert.deepStrictEqual(errors, []);
+  await ctx.close();
+});
+
+test('joystick portrait-rotated: stick works, stays clear of status-bar margins', async () => {
+  VIEWS.joyRot = { width: 390, height: 844 };
+  const { ctx, page, errors } = await open('joyRot');
+  await page.tap('#turnRotate'); await page.waitForTimeout(900);
+  await page.tap('#mNew'); await page.waitForTimeout(2600);
+  const rects = await page.evaluate(() => {
+    const s = document.getElementById('stick').getBoundingClientRect();
+    const j = document.querySelector('[data-k="jump"]').getBoundingClientRect();
+    return { stick: { top: s.top, left: s.left, right: s.right, bottom: s.bottom }, jump: { top: j.top, left: j.left, right: j.right, bottom: j.bottom } };
+  });
+  assert.ok(rects.stick.top >= 48, 'stick under status bar ' + rects.stick.top);
+  assert.ok(rects.stick.left >= 24 && rects.stick.right <= 390 - 24);
+  assert.ok(rects.jump.top >= 48 && rects.jump.bottom <= 844 - 24);
+  await dragStick(page, 0.8, 0);
+  const h = await st(page);
+  assert.strictEqual(h.held.r, true, 'rotated stick still maps to right');
+  await releaseStick(page);
+  await page.screenshot({ path: `${JOY_SHOTS}portrait-rotated-390x844.png` });
+  assert.deepStrictEqual(errors, []);
+  await ctx.close();
+});
+
+test('settings Controls toggles Joystick / Buttons and persists', async () => {
+  const { ctx, page } = await open('landscape');
+  await page.tap('#menu [data-panel="main"] [data-act="settings"]'); await page.waitForTimeout(150);
+  assert.strictEqual(await page.textContent('#sCtrl'), 'Joystick');
+  await page.tap('#sCtrl'); await page.waitForTimeout(150);
+  assert.strictEqual(await page.textContent('#sCtrl'), 'Buttons');
+  assert.strictEqual(await page.getAttribute('#touch', 'data-mode'), 'buttons');
+  assert.strictEqual(await page.evaluate(() => padButtons.hidden), false);
+  assert.strictEqual(await page.evaluate(() => getComputedStyle(document.getElementById('stick')).display), 'none');
+  await page.tap('#menu [data-panel="settings"] [data-act="back"]'); await page.waitForTimeout(100);
+  await page.tap('#menu [data-panel="main"] [data-act="settings"]'); await page.waitForTimeout(150);
+  assert.strictEqual(await page.textContent('#sCtrl'), 'Buttons');
+  await page.tap('#sCtrl'); await page.waitForTimeout(100);
+  assert.strictEqual(await page.getAttribute('#touch', 'data-mode'), 'stick');
   await ctx.close();
 });

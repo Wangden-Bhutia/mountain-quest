@@ -5,7 +5,7 @@
 const fs = require('fs'), path = require('path'), crypto = require('crypto');
 const root = path.join(__dirname, '..');
 const FILES = ['index.html', 'manifest.webmanifest', 'css/style.css',
-  'js/shell.js', 'js/assets.js', 'js/physics.js', 'js/data.js', 'js/game.js', 'js/pwa.js',
+  'js/shell.js', 'js/assets.js', 'js/physics.js', 'js/stick.js', 'js/data.js', 'js/game.js', 'js/pwa.js',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png', 'icons/apple-touch-icon.png'];
 const h = crypto.createHash('sha256');
 for (const f of FILES) { h.update(f + '\0'); h.update(fs.readFileSync(path.join(root, f))); }

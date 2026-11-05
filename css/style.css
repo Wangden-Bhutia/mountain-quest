@@ -41,11 +41,11 @@
     pointer-events: none;
   }
   body.touch #touch { display: flex; }
-  .pad { display: flex; gap: 12px; pointer-events: auto; }
+  .pad, .actions { display: flex; gap: 12px; pointer-events: auto; align-items: flex-end; }
   #touch button {
     pointer-events: auto;
     user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
-    touch-action: manipulation; -webkit-user-drag: none;
+    touch-action: none; -webkit-user-drag: none;
     width: 76px; height: 76px; border-radius: 50%;
     border: 2px solid rgba(255,255,255,0.55);
     background: rgba(16,34,50,0.30);
@@ -55,7 +55,37 @@
     transition: transform .06s ease, background .06s ease;
   }
   #touch button.on { background: rgba(255,208,224,0.55); transform: scale(0.94); }
-  #touch button.jump { width: 96px; height: 96px; font-size: 17px; letter-spacing: 1px; }
+  #touch button.jump { width: 72px; height: 72px; font-size: 15px; letter-spacing: 1px; }
+  /* round analog stick: translucent ring + thumb knob that follows the finger */
+  .stick {
+    position: relative; width: 118px; height: 118px;
+    pointer-events: auto; touch-action: none;
+    user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+  }
+  .stick-ring {
+    position: absolute; inset: 0; border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.42);
+    background: rgba(16,34,50,0.28);
+    backdrop-filter: blur(3px);
+  }
+  .stick-knob {
+    position: absolute; left: 50%; top: 50%;
+    width: 52px; height: 52px; margin: -26px 0 0 -26px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.7);
+    background: rgba(255,255,255,0.55);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+    pointer-events: none;
+    transition: background .06s ease;
+  }
+  .stick.active .stick-knob { background: rgba(255,208,224,0.78); border-color: #fff; }
+  .stick.hint .stick-ring {
+    border-color: #fff; background: rgba(255,208,224,0.38);
+    animation: tapme 1.15s ease-in-out infinite;
+  }
+  #touch[data-mode="buttons"] .stick { display: none; }
+  #touch[data-mode="stick"] #padButtons { display: none !important; }
+  #touch[data-mode="buttons"] #padButtons { display: flex; }
   #touch button.hint {
     border-color: #fff;
     background: rgba(255,208,224,0.62);
@@ -107,19 +137,23 @@
   /* ---- added in v2 ---- */
   #btnPause[hidden] { display: none; }
   body.menu-open #touch { display: none; }
-  body.rm #touch button.hint, body.rm #btnRot.attn { animation: none; }
+  body.rm #touch button.hint, body.rm .stick.hint .stick-ring, body.rm #btnRot.attn { animation: none; }
   @media (prefers-reduced-motion: reduce) {
-    #touch button.hint, #btnRot.attn { animation: none; }
+    #touch button.hint, .stick.hint .stick-ring, #btnRot.attn { animation: none; }
     #toast { transition: none; }
   }
   /* landscape phones: smaller, more see-through pads so the hero stays visible */
   @media (orientation: landscape) and (max-height: 500px) {
-    #touch button { width: 66px; height: 66px; font-size: 22px; }
-    #touch button.jump { width: 84px; height: 84px; font-size: 15px; }
+    #touch button { width: 64px; height: 64px; font-size: 20px; }
+    #touch button.jump { width: 68px; height: 68px; font-size: 14px; }
+    .stick { width: 104px; height: 104px; }
+    .stick-knob { width: 46px; height: 46px; margin: -23px 0 0 -23px; }
     #touch { padding: 0 max(12px, var(--sl)) 10px; }
   }
-  #stage.rot #touch button { width: 66px; height: 66px; font-size: 22px; }
-  #stage.rot #touch button.jump { width: 84px; height: 84px; font-size: 15px; }
+  #stage.rot #touch button { width: 64px; height: 64px; font-size: 20px; }
+  #stage.rot #touch button.jump { width: 68px; height: 68px; font-size: 14px; }
+  #stage.rot .stick { width: 104px; height: 104px; }
+  #stage.rot .stick-knob { width: 46px; height: 46px; margin: -23px 0 0 -23px; }
 
   #menu {
     position: absolute; inset: 0; z-index: 30;
