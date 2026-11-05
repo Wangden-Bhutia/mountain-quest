@@ -22,6 +22,8 @@
   function sync() {
     var m = mode(), els = document.querySelectorAll('[data-act="install"]');
     for (var i = 0; i < els.length; i++) els[i].hidden = m === 'none';
+    var tips = document.querySelectorAll('.install-tip');
+    for (var k = 0; k < tips.length; k++) tips[k].hidden = m === 'none';
   }
 
   window.addEventListener('beforeinstallprompt', function (e) {

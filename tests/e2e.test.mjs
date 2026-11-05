@@ -347,3 +347,99 @@ test('pause and settings have a full screen switch', async () => {
   assert.ok(await page.isVisible('#sFs')); await axe(page, 'settings with full screen');
   await ctx.close();
 });
+
+// ---- turned-by-hand mode on a portrait phone: status bar, edges, back button
+const STATUS_SHOTS = SHOTS.replace(/\/?$/, '/') + 'status-bar/';
+fs.mkdirSync(STATUS_SHOTS, { recursive: true });
+async function rotatedRects(page) {
+  return page.evaluate(() => {
+    const vis = e => e.offsetParent !== null && getComputedStyle(e).visibility !== 'hidden';
+    return [...document.querySelectorAll('#touch button, #ui .ctl')].filter(vis).map(e => {
+      const r = e.getBoundingClientRect();
+      return { id: e.id || e.dataset.k, top: r.top, left: r.left, right: r.right, bottom: r.bottom };
+    });
+  });
+}
+for (const [w, h] of [[390, 844], [412, 915]]) {
+  test(`turned mode ${w}x${h}: controls clear of the status bar and edges, art covers the screen`, async () => {
+    VIEWS['rot' + w] = { width: w, height: h };
+    const { ctx, page, errors } = await open('rot' + w);
+    await page.tap('#turnRotate'); await page.waitForTimeout(900);
+    assert.ok(await page.evaluate(() => window.__fsReq || 0) >= 1, 'rotating asks for full screen');
+    await page.tap('#mNew'); await page.waitForTimeout(2600);
+    const buf = await page.screenshot({ path: `${STATUS_SHOTS}after-rotated-${w}x${h}.png` });
+    const s = await page.$eval('#stage', e => { const r = e.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)]; });
+    assert.deepStrictEqual(s, [0, 0, w, h], 'turned stage covers the whole screen');
+    for (const r of await rotatedRects(page)) {
+      assert.ok(r.top >= 48, `${r.id} is under the status bar (top ${r.top})`);
+      assert.ok(r.left >= 24 && r.right <= w - 24 && r.bottom <= h - 24, `${r.id} too close to an edge ${JSON.stringify(r)}`);
+    }
+    const hud = await page.$eval('#stage .safe-probe', e => parseFloat(getComputedStyle(e).paddingLeft));
+    assert.ok(hud >= 48, 'HUD (game left = phone top) kept 48px off the status bar');
+    const blank = await page.evaluate(async (b64) => {
+      const img = new Image(); img.src = 'data:image/png;base64,' + b64; await img.decode();
+      const cv = document.createElement('canvas'); cv.width = img.width; cv.height = img.height;
+      const g = cv.getContext('2d'); g.drawImage(img, 0, 0);
+      const d = g.getImageData(0, 0, cv.width, cv.height).data; let n = 0, tot = 0;
+      const at = (x, y) => { const i = (y * cv.width + x) * 4; return Math.abs(d[i] - 13) < 12 && Math.abs(d[i + 1] - 27) < 12 && Math.abs(d[i + 2] - 42) < 12; };
+      const rows = {};
+      for (const y of [0, 2, cv.height - 3, cv.height - 1, Math.round(cv.height * 0.95)]) { let m = 0; for (let x = 0; x < cv.width; x += 4) { tot++; if (at(x, y)) { n++; m++; } } rows[y] = m; }
+      console.log('navy per row', JSON.stringify(rows), cv.width, cv.height);
+      return n / tot;
+    }, buf.toString('base64'));
+    assert.ok(blank < 0.02, `top/bottom rows show the page background: ${(blank * 100).toFixed(1)}%`);
+    assert.deepStrictEqual(errors, []);
+    await ctx.close();
+  });
+}
+
+test('turned mode with a reported 60px status-bar inset moves controls below it', async () => {
+  VIEWS.rotInset = { width: 412, height: 915 };
+  const { ctx, page } = await open('rotInset', { bypassCSP: true, init: () => {
+    document.addEventListener('DOMContentLoaded', () => { const st = document.createElement('style'); st.textContent = '.safe-probe.raw{padding:60px 0 0 0!important}'; document.head.appendChild(st); });
+  } });
+  await page.tap('#turnRotate'); await page.waitForTimeout(900);
+  await page.tap('#mNew'); await page.waitForTimeout(2600);
+  for (const r of await rotatedRects(page)) assert.ok(r.top >= 60, `${r.id} top ${r.top}`);
+  await page.screenshot({ path: `${STATUS_SHOTS}after-rotated-inset60-412x915.png` });
+  await ctx.close();
+});
+
+test('turned mode shows the full-screen / auto-rotate hint only once', async () => {
+  const { ctx, page } = await open('portrait');
+  await page.tap('#turnRotate'); await page.waitForTimeout(1300);
+  assert.match(await page.textContent('#toast'), /auto-rotate/);
+  await page.tap('#btnRot'); await page.waitForTimeout(300);
+  await page.tap('#turnRotate'); await page.waitForTimeout(1300);
+  assert.doesNotMatch(await page.textContent('#toast'), /auto-rotate/);
+  await ctx.close();
+});
+
+test('Android back pauses play and steps back through menus without leaving', async () => {
+  const { ctx, page } = await open('landscape');
+  const url = page.url();
+  await page.tap('#menu [data-panel="main"] [data-act="settings"]');
+  await page.waitForTimeout(200);
+  assert.strictEqual((await st(page)).menu, 'settings');
+  await page.evaluate(() => history.back()); await page.waitForTimeout(300);
+  assert.strictEqual((await st(page)).menu, 'main', 'back from settings goes to the main menu');
+  await page.tap('#mNew'); await page.waitForTimeout(2600);
+  await page.tap('[data-k="right"]', { force: true }); await page.waitForTimeout(100);
+  assert.strictEqual((await st(page)).state, 'play');
+  await page.evaluate(() => history.back()); await page.waitForTimeout(300);
+  const s = await st(page);
+  assert.ok(s.paused && s.menu === 'pause', 'back pauses the game');
+  assert.strictEqual(page.url(), url, 'still on the game page');
+  await ctx.close();
+});
+
+test('settings leads with a prominent Install app button when the browser offers install', async () => {
+  const { ctx, page } = await open('landscape');
+  await page.evaluate(() => { const e = new Event('beforeinstallprompt'); e.prompt = () => Promise.resolve(); e.userChoice = Promise.resolve({}); window.dispatchEvent(e); });
+  await page.tap('#menu [data-panel="main"] [data-act="settings"]'); await page.waitForTimeout(200);
+  const first = await page.$eval('#menu [data-panel="settings"] button:not([hidden])', b => b.dataset.act + '|' + b.className);
+  assert.match(first, /^install\|.*primary/);
+  assert.ok(await page.isVisible('#menu [data-panel="settings"] .install-tip'));
+  await axe(page, 'settings with install');
+  await ctx.close();
+});

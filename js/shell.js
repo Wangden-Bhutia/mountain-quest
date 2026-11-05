@@ -22,11 +22,11 @@
     var rotated = false;
     var toastTimer = 0;
 
-    function toast(msg) {
+    function toast(msg, ms) {
       toastEl.textContent = msg;
       toastEl.classList.add('show');
       clearTimeout(toastTimer);
-      toastTimer = setTimeout(function () { toastEl.classList.remove('show'); }, 2400);
+      toastTimer = setTimeout(function () { toastEl.classList.remove('show'); }, ms || 2400);
     }
 
     btnSnd.addEventListener('click', function (e) {
@@ -85,20 +85,60 @@
         stage.classList.remove('rot');
         stage.style.width = '';
         stage.style.height = '';
+        stage.style.transform = '';
         btnRot.classList.remove('on');
         return;
       }
-      var w = window.innerWidth, h = window.innerHeight;
+      // size from the box the page really has (#app is 100dvh), not innerHeight,
+      // so the turned stage covers the whole visible screen
+      var w = app.clientWidth || window.innerWidth, h = app.clientHeight || window.innerHeight;
+      if (window.visualViewport) { w = Math.max(w, Math.round(visualViewport.width)); h = Math.max(h, Math.round(visualViewport.height)); }
       stage.classList.add('rot');
       stage.style.width = h + 'px';
       stage.style.height = w + 'px';
+      stage.style.transform = 'translateX(' + w + 'px) rotate(90deg)';
       btnRot.classList.add('on');
+    }
+
+    // Safe areas follow the stage. Turned 90 degrees clockwise, the game's left edge
+    // is the phone's top (status bar), its top is the phone's right, and so on.
+    // Android Chrome reports no insets in a browser tab, so on touch screens the
+    // turned game also keeps controls 48px off the real top and 24px off other edges.
+    var rawProbe = document.createElement('div');
+    rawProbe.className = 'safe-probe raw';
+    document.body.appendChild(rawProbe);
+    var TOP_MIN = 48, EDGE_MIN = 24;
+    function syncSafe() {
+      var cs = getComputedStyle(rawProbe);
+      var t = parseFloat(cs.paddingTop) || 0, r = parseFloat(cs.paddingRight) || 0,
+        b = parseFloat(cs.paddingBottom) || 0, l = parseFloat(cs.paddingLeft) || 0;
+      var props = ['--sl', '--st', '--sr', '--sb'];
+      if (rotated) {
+        var touch = document.body.classList.contains('touch');
+        var v = [Math.max(t, touch ? TOP_MIN : 0), Math.max(r, touch ? EDGE_MIN : 0),
+          Math.max(b, touch ? EDGE_MIN : 0), Math.max(l, touch ? EDGE_MIN : 0)];
+        for (var i = 0; i < 4; i++) stage.style.setProperty(props[i], v[i] + 'px');
+      } else {
+        for (var j = 0; j < 4; j++) stage.style.removeProperty(props[j]);
+      }
+      if (window.__MQ_RESAFE) window.__MQ_RESAFE();
+    }
+    window.__MQ_SYNC_SAFE = syncSafe;
+    var HINT_KEY = 'mountain-quest:rot-hint';
+    function rotHintOnce() {
+      var seen = false;
+      try { seen = localStorage.getItem(HINT_KEY) === '1'; localStorage.setItem(HINT_KEY, '1'); } catch (e) { seen = !!window.__mqRotHint; window.__mqRotHint = true; }
+      if (seen) return false;
+      toast('For full screen, tap Install app or the full-screen button. Tip: turn on auto-rotate so you can hold the phone sideways', 6500);
+      return true;
     }
 
     function setRotate(on, msg) {
       rotated = on;
       applyRotate();
+      syncSafe();
       if (window.__MQ_TURN) window.__MQ_TURN();
+      if (on && rotHintOnce()) return;
       if (msg) toast(msg);
     }
 
@@ -141,9 +181,11 @@
         setRotate(false);
       } else if (rotated) {
         applyRotate();
+        syncSafe();
       }
     }
     window.addEventListener('resize', onResize);
+    if (window.visualViewport) window.visualViewport.addEventListener('resize', onResize);
     window.addEventListener('orientationchange', function () {
       setTimeout(onResize, 260);
     });
@@ -170,7 +212,12 @@
       try { var p = so.lock('landscape'); if (p && p.catch) p.catch(function () {}); } catch (err) {}
     }
     var lockedOnce = false;
+    var rotFsTried = false;
     function firstGesture() {
+      // turned by hand: the first tap also asks for full screen, which hides the status bar
+      if (rotated && !rotFsTried && !isFS() && document.body.classList.contains('touch')) {
+        rotFsTried = true; enterFull().catch(function () {});
+      }
       if (lockedOnce) return; lockedOnce = true;
       if (isFS() || window.matchMedia('(display-mode: fullscreen)').matches || window.matchMedia('(display-mode: standalone)').matches) tryLock();
     }
