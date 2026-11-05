@@ -17,17 +17,30 @@ self.addEventListener('activate', function (e) {
   }).then(function () { return self.clients.claim(); }));
 });
 
-// cache first, same origin only; page navigations fall back to the cached game
+// network first, same origin only: online players always get the newest build
+// (a cache-first worker kept serving an old letterboxed build to returning
+// visitors). The cache is refreshed on every good response and used offline.
+function fromNet(req, key) {
+  return fetch(req, { cache: 'no-cache' }).then(function (r) {
+    if (r && r.ok && r.type === 'basic') {
+      var copy = r.clone();
+      caches.open(CACHE).then(function (c) { return c.put(key || req, copy); });
+    }
+    return r;
+  });
+}
 self.addEventListener('fetch', function (e) {
   var req = e.request;
   if (req.method !== 'GET') return;
   var url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
   if (req.mode === 'navigate') {
-    e.respondWith(caches.match('./index.html', { ignoreSearch: true }).then(function (r) {
-      return r || fetch(req);
-    }).catch(function () { return caches.match('./index.html'); }));
+    e.respondWith(fromNet(req, './index.html').catch(function () {
+      return caches.match('./index.html', { ignoreSearch: true });
+    }));
     return;
   }
-  e.respondWith(caches.match(req, { ignoreSearch: true }).then(function (r) { return r || fetch(req); }));
+  e.respondWith(fromNet(req).catch(function () {
+    return caches.match(req, { ignoreSearch: true }).then(function (r) { return r || Response.error(); });
+  }));
 });

@@ -12,7 +12,7 @@ const FS_SHOTS = SHOTS.replace(/\/?$/, '/') + 'fullscreen/';
 fs.mkdirSync(FS_SHOTS, { recursive: true });
 fs.mkdirSync(SHOTS, { recursive: true });
 const VIEWS = { portrait: { width: 390, height: 844 }, landscape: { width: 844, height: 390 } };
-const ASPECTS = { '844x390': [844, 390], '915x412': [915, 412], '960x384': [960, 384], '667x375': [667, 375], '1024x768': [1024, 768] };
+const ASPECTS = { '844x390': [844, 390], '915x412': [915, 412], '960x384': [960, 384], '667x375': [667, 375], '1024x768': [1024, 768], '1024x478': [1024, 478], '960x432': [960, 432], '1000x460': [1000, 460], '923x415': [923, 415], '1170x450': [1170, 450] };
 let browser;
 test.before(async () => { browser = await chromium.launch(); });
 test.after(async () => { await browser.close(); });
@@ -308,8 +308,10 @@ for (const [name, [w, h]] of Object.entries(ASPECTS)) {
       const cv = document.createElement('canvas'); cv.width = img.width; cv.height = img.height;
       const g = cv.getContext('2d'); g.drawImage(img, 0, 0);
       const d = g.getImageData(0, 0, cv.width, cv.height).data; let n = 0, tot = 0;
-      const at = (x, y) => { const i = (y * cv.width + x) * 4; return d[i] === 13 && d[i + 1] === 27 && d[i + 2] === 42; };
-      for (let y = 0; y < cv.height; y += 4) { tot += 2; if (at(0, y)) n++; if (at(cv.width - 1, y)) n++; }
+      const at = (x, y) => { const i = (y * cv.width + x) * 4; return Math.abs(d[i] - 13) < 12 && Math.abs(d[i + 1] - 27) < 12 && Math.abs(d[i + 2] - 42) < 12; };
+      // outer edges plus columns 2% and 8% in from each side, where a letterbox bar would sit
+      const cols = [0, cv.width - 1, Math.round(cv.width * 0.02), Math.round(cv.width * 0.98), Math.round(cv.width * 0.08), Math.round(cv.width * 0.92)];
+      for (let y = 0; y < cv.height; y += 4) for (const x of cols) { tot++; if (at(x, y)) n++; }
       for (let x = 0; x < cv.width; x += 4) { tot += 2; if (at(x, 0)) n++; if (at(x, cv.height - 1)) n++; }
       return n / tot;
     }, buf.toString('base64'));
